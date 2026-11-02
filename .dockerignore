@@ -7,6 +7,5 @@
 **/*.egg-info
 **/.env
 .git
-apps/web/public/mediapipe
 apps/api/src/generated
 docs

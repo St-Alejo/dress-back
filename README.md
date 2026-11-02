@@ -1,4 +1,4 @@
-# Vestirse · Probador de ropa virtual
+# Vestirse · Back (API + IA)
 
 Probador virtual de tres capas, implementado a partir de [`docs/README-virtual-tryon.md`](docs/README-virtual-tryon.md):
 
@@ -23,6 +23,10 @@ Decisiones: [ADR 0001](docs/adr/0001-fotos-reales-y-motor-gratuito.md) (fotos re
 el prototipo descartado de mangas colgantes) y [ADR 0003](docs/adr/0003-vision-opcional-con-claude.md)
 (visión opcional con Claude).
 
+> Este repositorio contiene **solo el back**: API NestJS, microservicio de IA (FastAPI), motor de tallas,
+> esquema de base de datos y seed del catálogo. El front Angular está en
+> **[St-Alejo/dress](https://github.com/St-Alejo/dress)**.
+
 ## Puesta en marcha
 
 Requisitos: Node ≥ 22.12, Python ≥ 3.12, Docker.
@@ -35,11 +39,8 @@ npm run infra:up                  # Postgres :55432, Redis :6380, S3 (RustFS) :9
 npm run build:packages
 npm run db:migrate                # aplica migraciones
 npm run db:seed                   # 4 marcas, 47 prendas, 12 modelos, usuario admin
-npm run dev:api                   # http://localhost:3000/api
-npm run dev:web                   # http://localhost:4200
+npm run dev:api                   # http://localhost:3000/api (el front, en su repo, va en :4200)
 ```
-
-Capturas de la app funcionando con el motor real: [`docs/capturas/`](docs/capturas/README.md).
 
 Admin de demo: `admin@vestirse.local` / `admin1234` (cámbialo con `ADMIN_EMAIL` / `ADMIN_PASSWORD` antes del seed).
 
@@ -51,7 +52,7 @@ Admin de demo: `admin@vestirse.local` / `admin1234` (cámbialo con `ADMIN_EMAIL`
 ```bash
 docker compose -f infra/docker-compose.yml --profile full up -d --build
 docker compose -f infra/docker-compose.yml exec api npm run db:seed   # la primera vez
-# web en http://localhost:8080 (WEB_PORT=... para cambiarlo; AI_WORKER_PORT para el worker)
+# API en http://localhost:3000/api (API_PORT=... para cambiarlo; AI_WORKER_PORT para el worker)
 ```
 
 La API aplica las migraciones al arrancar y expone `GET /api/health` (base de datos y Redis críticos;
@@ -129,35 +130,29 @@ levantar la infraestructura (`WORKER_TOKEN=... npm run infra:up`).
 ## Tests
 
 ```bash
-npm test                  # fit-engine, shared-types (tipos), api (jest), web (vitest)
+npm test                  # fit-engine, shared-types (tipos), api (jest)
 npm run test:invariants   # solo las invariantes éticas
 cd services/ai-worker && pytest
-npm run e2e:camera -w apps/web   # e2e de la cámara (app levantada y Chrome): cámara falsa .y4m, tela en
-                                 # torso, piernas y pies (pantalón y look top+calzado), ≥ 12 fps y cero
-                                 # errores de página; --out guarda capturas, --api si la API no va en :3000
 ```
-
-Las capturas del recorrido están en [`docs/capturas/`](docs/capturas/README.md).
 
 ### Invariantes éticas verificadas (sección 4 del documento)
 
 | Regla | Cómo se verifica |
 |---|---|
 | Nunca obligar a subir foto | Test de tipos: `TryOnSession.uploadedPhotoUrl` debe ser opcional (falla si se vuelve obligatorio) |
-| Sin edición/adelgazamiento de silueta | Test que recorre todas las rutas de la API contra un patrón prohibido; `BodyGeometry` solo acepta medidas reales; script estático del cliente |
+| Sin edición/adelgazamiento de silueta | Test que recorre todas las rutas de la API contra un patrón prohibido; `BodyGeometry` solo acepta medidas reales; script estático del cliente (repo del front) |
 | Sin comparación entre usuarios | Mismo test de rutas (`leaderboard`, `compare-users`…) |
 | Catálogo de cuerpos diverso desde el día 1 | Test del seed (XS–4XL, ≥10 tipos, ≥5 tonos de piel) + el panel admin **rechaza** borrar un cuerpo si rompe la cobertura |
 | La talla nunca es certeza | 48 casos: toda recomendación trae confianza y base; el override siempre se acepta |
-| Cámara: solo video, siempre se apaga, sin red | Test de `CameraService` + script que prohíbe red en `features/live-overlay` |
+| Cámara: solo video, siempre se apaga, sin red | En el repo del front: test de `CameraService` + script que prohíbe red en `features/live-overlay` |
 | Retención real (sección 8) | Test del cron de TTL y del borrado de cuenta con almacenamiento en memoria; consentimiento `false` por defecto en el esquema |
 
 ## Arquitectura
 
 ```
-apps/web      Angular 21 (standalone, signals, zoneless) · Tailwind 4 · Transloco es/en · PWA
 apps/api      NestJS 11 hexagonal · Prisma 7 · BullMQ · Socket.IO · opossum
 services/ai-worker   FastAPI · motores de Hugging Face, fal CatVTON, Replicate y mock · visión con Groq o Claude
-packages/shared-types   modelo de datos canónico (sección 9)
+packages/shared-types   modelo de datos canónico (sección 9), copiado en el repo del front
 packages/fit-engine     Track C, sin I/O
 ```
 

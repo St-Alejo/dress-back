@@ -59,11 +59,12 @@ services:
     ports: ["${AI_WORKER_PORT:-8000}:8000"]
     # El healthcheck vive en el Dockerfile del worker.
 
-  # --- Perfil "full": la app completa en contenedores (docker compose --profile full up -d --build) ---
+  # --- Perfil "full": todo el back en contenedores (docker compose --profile full up -d --build) ---
   # Los secretos por defecto son SOLO para desarrollo local; en otro entorno defínelos en infra/.env.
   api:
     profiles: [full]
     build: { context: .., dockerfile: infra/docker/api.Dockerfile }
+    ports: ["${API_PORT:-3000}:3000"]
     environment:
       DATABASE_URL: postgresql://vestirse:vestirse@postgres:5432/vestirse
       REDIS_HOST: redis
@@ -77,18 +78,12 @@ services:
       WORKER_TOKEN: ${WORKER_TOKEN:-}
       JWT_SECRET: ${JWT_SECRET:-solo-desarrollo-jwt-secret-cambiar}
       APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-solo-desarrollo-cifrado-cambiar}
-      WEB_ORIGIN: http://localhost:${WEB_PORT:-8080}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:4200}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       s3: { condition: service_healthy }
       ai-worker: { condition: service_started }
-
-  web:
-    profiles: [full]
-    build: { context: .., dockerfile: infra/docker/web.Dockerfile }
-    ports: ["${WEB_PORT:-8080}:80"]
-    depends_on: [api]
 
 volumes:
   pgdata:
