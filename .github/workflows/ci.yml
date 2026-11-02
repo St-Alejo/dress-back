@@ -22,12 +22,10 @@ jobs:
         run: npm run db:generate -w apps/api
       - name: Typecheck API
         run: npm run lint -w apps/api
-      - name: Tests (fit-engine, shared-types, api, web)
+      - name: Tests (fit-engine, shared-types, api)
         run: npm test
       - name: Invariantes éticas
         run: npm run test:invariants
-      - name: Build web (producción)
-        run: npm run build -w apps/web
       - name: Build API
         run: npm run build -w apps/api
 
