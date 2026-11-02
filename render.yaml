@@ -1,0 +1,79 @@
+# Blueprint de Render (plan gratuito): API NestJS + ai-worker FastAPI.
+# Postgres y almacenamiento S3 van en Supabase (proyecto "vestirse"); Redis es el Key Value
+# gratuito de Render "vestirse-redis". El front se despliega aparte en Vercel (repo dress).
+# Los valores con sync: false se escriben a mano en el panel de Render al crear el Blueprint.
+services:
+  - type: web
+    name: vestirse-worker
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./services/ai-worker/Dockerfile
+    dockerContext: ./services/ai-worker
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: WORKER_TOKEN
+        generateValue: true
+      - key: DEFAULT_PROVIDER
+        value: hf-chain
+      - key: VISION_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+
+  - type: web
+    name: vestirse-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./infra/docker/api.Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      # Cadena "Session pooler" de Supabase (IPv4): postgresql://postgres.<ref>:<clave>@<host>:5432/postgres
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_HOST
+        value: red-dbki0agae00c73874idg
+      - key: REDIS_PORT
+        value: "6379"
+      - key: S3_ENDPOINT
+        value: https://odihddldokbafbsogopm.storage.supabase.co/storage/v1/s3
+      - key: S3_REGION
+        value: us-west-1
+      - key: S3_BUCKET
+        value: vestirse
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_ENCRYPTION_KEY
+        generateValue: true
+      - key: WORKER_TOKEN
+        fromService:
+          type: web
+          name: vestirse-worker
+          envVarKey: WORKER_TOKEN
+      - key: AI_WORKER_URL
+        value: https://vestirse-worker.onrender.com
+      - key: AI_PROVIDER
+        value: hf-chain
+      - key: WEB_ORIGIN
+        value: https://vestirse.vercel.app
+      # Primer arranque: carga el catálogo de demo si la base está vacía (no borra cuentas).
+      - key: RESEED_ONCE
+        value: "1"
+      - key: ADMIN_EMAIL
+        value: admin@vestirse.app
+      - key: ADMIN_PASSWORD
+        sync: false
