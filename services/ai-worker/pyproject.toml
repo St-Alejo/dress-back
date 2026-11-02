@@ -15,7 +15,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "respx>=0.22"]
+# numpy: lo usa el test de anclas de garment_prep (herramienta de catálogo, no la imagen Docker).
+dev = ["pytest>=8", "respx>=0.22", "numpy>=2"]
 # Solo para preparar el catálogo (no entra en la imagen Docker). torch conviene instalarlo antes
 # desde https://download.pytorch.org/whl/cpu para no bajar la versión con CUDA.
 tools = ["rembg[cpu]>=2.0.60", "transformers>=5.0", "torch>=2.6", "torchvision>=0.21", "scipy>=1.13"]
