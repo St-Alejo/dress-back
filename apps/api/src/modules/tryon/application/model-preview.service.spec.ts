@@ -16,7 +16,7 @@ class FakeTransfer extends GarmentTransferPort {
   }
 }
 
-async function setup(category: GarmentItem['category'] = 'dress', onePiece = false) {
+async function setup(category: GarmentItem['category'] = 'dress', onePiece = false, handsInPockets = false) {
   const storage = new MemoryStorage();
   storage.objects.set('catalog/bodies/b1/photo.jpg', Buffer.from('person'));
   storage.objects.set('catalog/garments/g1/photo.jpg', Buffer.from('garment'));
@@ -27,7 +27,7 @@ async function setup(category: GarmentItem['category'] = 'dress', onePiece = fal
   const catalog = {
     findGarment: async () => ({ id: 'g1', name: 'Vestido', category, color: '#ff0000' }) as GarmentItem,
     garmentPhoto: async () => ({ key: 'catalog/garments/g1/photo.jpg', photoType: 'flat-lay' }),
-    bodyModelPhoto: async () => ({ key: 'catalog/bodies/b1/photo.jpg', onePiece }),
+    bodyModelPhoto: async () => ({ key: 'catalog/bodies/b1/photo.jpg', onePiece, handsInPockets }),
     findPreviewKey: async (b: string, g: string) => previews.get(`${b}:${g}`) ?? null,
     savePreview: async (b: string, g: string, key: string) => void previews.set(`${b}:${g}`, key),
   } as unknown as CatalogRepository;
@@ -77,5 +77,13 @@ describe('ModelPreviewService', () => {
     }
     const jacket = await setup('outerwear', true);
     await expect(jacket.service.ensure('b1', 'g1')).resolves.toMatchObject({ cached: false });
+  });
+
+  it('con las manos en los bolsillos no cambia la parte de abajo, pero sí la de arriba', async () => {
+    const skirt = await setup('bottom', false, true);
+    await expect(skirt.service.ensure('b1', 'g1')).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(skirt.transfer.calls).toHaveLength(0);
+    const shirt = await setup('top', false, true);
+    await expect(shirt.service.ensure('b1', 'g1')).resolves.toMatchObject({ cached: false });
   });
 });

@@ -49,13 +49,18 @@ export interface SimilarBodyModel {
   pose?: BodyPose;
   /** En la foto lleva una prenda de una pieza (vestido): ver `aiCanDress`. */
   onePiece?: boolean;
+  /** En la foto tiene las manos en los bolsillos: ver `aiCanDress`. */
+  handsInPockets?: boolean;
 }
 
 /**
  * Si la IA puede vestir la prenda sobre la foto de este modelo. Sobre un vestido, el motor solo
  * cambia la mitad de arriba o la de abajo y el resto del vestido sigue ahí (sale una túnica).
+ * Con las manos en los bolsillos tapa la cintura: una falda o un palazzo salen convertidos en el
+ * pantalón que ya llevaba.
  */
-export function aiCanDress(body: Pick<SimilarBodyModel, 'onePiece'>, category: GarmentCategory): boolean {
+export function aiCanDress(body: Pick<SimilarBodyModel, 'onePiece' | 'handsInPockets'>, category: GarmentCategory): boolean {
+  if (body.handsInPockets && category === 'bottom') return false;
   return !(body.onePiece && (category === 'top' || category === 'bottom'));
 }
 

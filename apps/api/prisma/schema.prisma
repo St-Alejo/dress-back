@@ -146,6 +146,8 @@ model BodyModel {
   pose        Json?
   /// En la foto lleva una prenda de una pieza (vestido): la IA no le cambia solo la parte de arriba o de abajo.
   onePiece    Boolean            @default(false)
+  /// En la foto tiene las manos en los bolsillos: la IA no le cambia la parte de abajo.
+  handsInPockets Boolean         @default(false)
   sortOrder   Int                @default(0)
   previews    BodyModelPreview[]
 }

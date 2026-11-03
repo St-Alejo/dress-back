@@ -55,7 +55,7 @@ export class ModelPreviewService {
     ]);
     if (!garment || !photo || !body) throw new NotFoundException();
     if (!WEARABLE.has(garment.category)) throw new UnprocessableEntityException('esta prenda no se puede probar sobre un modelo');
-    if (!aiCanDress(body, garment.category)) throw new UnprocessableEntityException('este modelo lleva vestido: la IA no le cambia solo una parte');
+    if (!aiCanDress(body, garment.category)) throw new UnprocessableEntityException('en la foto de este modelo la IA no puede cambiar esa parte');
 
     const [person, garmentImage] = await Promise.all([this.storage.getBuffer(body.key), this.storage.getBuffer(photo.key)]);
     if (!person || !garmentImage) throw new NotFoundException();

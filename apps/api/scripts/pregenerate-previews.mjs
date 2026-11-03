@@ -9,8 +9,10 @@ const option = (name, fallback) => (args.includes(name) ? args[args.indexOf(name
 const API = option('--api', 'http://localhost:3000/api');
 const MAX = Number(option('--max', '6'));
 const WEARABLE = new Set(['top', 'bottom', 'dress', 'outerwear']);
-// Sobre un modelo con vestido la IA no cambia solo arriba o abajo (aiCanDress en shared-types).
-const aiCanDress = (body, garment) => !(body.onePiece && (garment.category === 'top' || garment.category === 'bottom'));
+// Sobre un modelo con vestido la IA no cambia solo arriba o abajo, y con las manos en los bolsillos
+// no cambia la parte de abajo (aiCanDress en shared-types).
+const aiCanDress = (body, garment) =>
+  !(body.handsInPockets && garment.category === 'bottom') && !(body.onePiece && (garment.category === 'top' || garment.category === 'bottom'));
 // El endpoint admite 6 peticiones por minuto.
 const PAUSE_MS = 11_000;
 

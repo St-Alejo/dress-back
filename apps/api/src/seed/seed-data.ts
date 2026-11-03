@@ -17,6 +17,8 @@ export interface SeedBody {
   skinTone: string;
   /** Su foto lleva vestido (ver aiCanDress en shared-types). */
   onePiece?: boolean;
+  /** Su foto tiene las manos en los bolsillos (ver aiCanDress en shared-types). */
+  handsInPockets?: boolean;
 }
 
 const SKIN = ['#F5D6C6', '#E8B998', '#D39B6F', '#A86B45', '#7D4A2D', '#4F2F1D'];
@@ -28,7 +30,7 @@ export const BODIES: SeedBody[] = [
   { key: 'b04', bodyTypeTag: 'average-curvy', typicalSize: 'L', heightRange: [160, 170], shape: { heightCm: 165, shoulderCm: 39, chestCm: 103, waistCm: 83, hipCm: 110 }, skinTone: SKIN[0] },
   { key: 'b05', bodyTypeTag: 'athletic', typicalSize: 'M', heightRange: [172, 180], shape: { heightCm: 176, shoulderCm: 46, chestCm: 98, waistCm: 78, hipCm: 95 }, skinTone: SKIN[2] },
   { key: 'b06', bodyTypeTag: 'average-broad', typicalSize: 'L', heightRange: [172, 182], shape: { heightCm: 177, shoulderCm: 47, chestCm: 106, waistCm: 92, hipCm: 103 }, skinTone: SKIN[2] },
-  { key: 'b07', bodyTypeTag: 'tall-slim', typicalSize: 'M', heightRange: [180, 190], shape: { heightCm: 185, shoulderCm: 44, chestCm: 93, waistCm: 77, hipCm: 93 }, skinTone: SKIN[4] },
+  { key: 'b07', bodyTypeTag: 'tall-slim', typicalSize: 'M', heightRange: [180, 190], shape: { heightCm: 185, shoulderCm: 44, chestCm: 93, waistCm: 77, hipCm: 93 }, skinTone: SKIN[4], handsInPockets: true },
   { key: 'b08', bodyTypeTag: 'tall-broad', typicalSize: 'XL', heightRange: [184, 195], shape: { heightCm: 190, shoulderCm: 50, chestCm: 113, waistCm: 98, hipCm: 108 }, skinTone: SKIN[0] },
   { key: 'b09', bodyTypeTag: 'plus-hourglass', typicalSize: 'XXL', heightRange: [162, 172], shape: { heightCm: 167, shoulderCm: 42, chestCm: 120, waistCm: 100, hipCm: 124 }, skinTone: SKIN[4] },
   { key: 'b10', bodyTypeTag: 'plus-round', typicalSize: '3XL', heightRange: [168, 178], shape: { heightCm: 173, shoulderCm: 46, chestCm: 128, waistCm: 118, hipCm: 128 }, skinTone: SKIN[4] },
