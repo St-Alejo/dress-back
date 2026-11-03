@@ -245,6 +245,11 @@ class ChainProvider(TryOnProvider):
 
 
 def chain(
-    token: str | None, client_factory: ClientFactory = _default_client, budget_seconds: float = CHAIN_BUDGET_SECONDS
+    token: str | None,
+    client_factory: ClientFactory = _default_client,
+    budget_seconds: float = CHAIN_BUDGET_SECONDS,
+    first: list[TryOnProvider] | None = None,
 ) -> ChainProvider:
-    return ChainProvider([HfSpaceProvider(SPACES[n], token, client_factory) for n in CHAIN_ORDER], budget_seconds)
+    """`first`: motores que van antes de los Spaces (p. ej. la GPU local, sin cuota)."""
+    spaces = [HfSpaceProvider(SPACES[n], token, client_factory) for n in CHAIN_ORDER]
+    return ChainProvider([*(first or []), *spaces], budget_seconds)

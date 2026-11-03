@@ -13,6 +13,7 @@ from ..contract import WorkerError
 from .base import Credentials, TryOnProvider
 from .hf_space import SPACES, HfSpaceProvider, chain
 from .legacy import FalCatVTONProvider, ReplicateProvider
+from .local_gpu import LocalGpuProvider
 from .mock import MockProvider
 
 Factory = Callable[[Credentials, Settings], TryOnProvider]
@@ -42,7 +43,11 @@ def default_registry() -> ProviderRegistry:
     # Mismos nombres que AiProvider en packages/shared-types.
     r.register(
         "hf-chain",
-        lambda c, s: chain(c.api_key or s.hf_token, budget_seconds=max(30, s.generation_timeout_seconds - 20)),
+        lambda c, s: chain(
+            c.api_key or s.hf_token,
+            budget_seconds=max(30, s.generation_timeout_seconds - 20),
+            first=[LocalGpuProvider(s.local_tryon_url)] if s.local_tryon_url else None,
+        ),
     )
     for spec in SPACES.values():
         r.register(spec.name, lambda c, s, spec=spec: HfSpaceProvider(spec, c.api_key or s.hf_token))

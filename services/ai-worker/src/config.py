@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     generation_timeout_seconds: int = 240
     # Token gratuito de Hugging Face para los Spaces (vacío = anónimo, con menos cuota de GPU).
     hf_token: str = ""
+    # Servidor de FASHN en una GPU propia (services/gpu-tryon). Si se define, `hf-chain` lo prueba primero.
+    local_tryon_url: str = ""
     # Groq: visión para el control de calidad de la foto y el etiquetado de prendas.
     groq_api_key: str = ""
     groq_vision_model: str = "qwen/qwen3.8-27b"
