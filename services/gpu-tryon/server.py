@@ -30,6 +30,22 @@ CATEGORIES = {"tops", "bottoms", "one-pieces"}
 PHOTO_TYPES = {"flat-lay", "model"}
 
 
+def _release_vram() -> float:
+    """Devuelve al driver la memoria que PyTorch dejó reservada y da el pico de la petición (GB).
+
+    Sin esto la caché crece imagen a imagen y, al pasar de la VRAM, Windows usa RAM compartida:
+    cada imagen tarda el doble o el triple.
+    """
+    import torch
+
+    if not torch.cuda.is_available():
+        return 0.0
+    peak = torch.cuda.max_memory_reserved() / 2**30
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
+    return peak
+
+
 def build_handler(pipeline, lock: threading.Lock):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt: str, *args) -> None:  # sin rutas ni cuerpos en el log
@@ -83,9 +99,11 @@ def build_handler(pipeline, lock: threading.Lock):
                     )
                 except Exception as exc:
                     return self._error(500, f"fallo del modelo: {type(exc).__name__}")
+                finally:
+                    peak = _release_vram()
             out = io.BytesIO()
             result.images[0].save(out, format="PNG")
-            print(f"[gpu-tryon] {category} en {time.perf_counter() - started:.1f} s", flush=True)
+            print(f"[gpu-tryon] {category} en {time.perf_counter() - started:.1f} s (pico VRAM {peak:.1f} GB)", flush=True)
             self._send(200, out.getvalue(), "image/png")
 
     return Handler
