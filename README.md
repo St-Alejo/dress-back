@@ -132,6 +132,7 @@ levantar la infraestructura (`WORKER_TOKEN=... npm run infra:up`).
 ```bash
 npm test                  # fit-engine, shared-types (tipos), api (jest)
 npm run test:invariants   # solo las invariantes éticas
+node apps/api/scripts/smoke.mjs [base] [--generate]   # humo contra una API levantada (local o producción)
 cd services/ai-worker && pytest
 ```
 
