@@ -10,6 +10,8 @@ definido (ver README.md de esta carpeta). Solo usa la biblioteca estándar adem�
 POST /tryon   JSON {person, garment (base64), category, photoType, segmentationFree, steps, seed} → image/png
 GET  /health  200 cuando el modelo está cargado
 
+Tras generar, color_match.py acerca el tono de una prenda lisa al de su foto (FASHN a veces lo apaga).
+
 Privacidad: las imágenes viven solo en memoria durante la petición; no se escribe nada a disco.
 """
 
@@ -23,7 +25,10 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import numpy as np
 from PIL import Image
+
+from color_match import LABELS, match_garment_color
 
 MAX_BODY = 25 * 1024 * 1024
 CATEGORIES = {"tops", "bottoms", "one-pieces"}
@@ -44,6 +49,18 @@ def _release_vram() -> float:
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
     return peak
+
+
+def _match_color(pipeline, person, garment, image, category: str):
+    """Ajuste de tono con el mismo segmentador de personas que usa FASHN; si falla, la imagen tal cual."""
+    try:
+        from fashn_human_parser import LABELS_TO_IDS
+
+        seg = pipeline.hp_model.predict(np.asarray(image.convert("RGB")))
+        labels = tuple(LABELS_TO_IDS[label] for label in LABELS[category])
+        return match_garment_color(person, garment, image, seg, labels)
+    except Exception as exc:  # un ajuste cosmético nunca tumba la prueba
+        return image, f"sin ajuste de color ({type(exc).__name__})"
 
 
 def build_handler(pipeline, lock: threading.Lock):
@@ -101,9 +118,11 @@ def build_handler(pipeline, lock: threading.Lock):
                     return self._error(500, f"fallo del modelo: {type(exc).__name__}")
                 finally:
                     peak = _release_vram()
+                # Dentro de la fila: el segmentador es el del pipeline y comparte la GPU.
+                image, color = _match_color(pipeline, person, garment, result.images[0], category)
             out = io.BytesIO()
-            result.images[0].save(out, format="PNG")
-            print(f"[gpu-tryon] {category} en {time.perf_counter() - started:.1f} s (pico VRAM {peak:.1f} GB)", flush=True)
+            image.save(out, format="PNG")
+            print(f"[gpu-tryon] {category} en {time.perf_counter() - started:.1f} s (pico VRAM {peak:.1f} GB; {color})", flush=True)
             self._send(200, out.getvalue(), "image/png")
 
     return Handler
