@@ -7,9 +7,10 @@ definido (ver README.md de esta carpeta). Solo usa la biblioteca estándar adem�
 
     python server.py --weights-dir ./weights [--port 8020]
 
-POST /tryon   JSON {person, garment (base64), category, photoType, segmentationFree, steps, seed} → image/png
+POST /tryon   JSON {person, garment (base64), category, photoType, segmentationFree, wideCut, steps, seed} → image/png
 GET  /health  200 cuando el modelo está cargado
 
+Con wideCut, una prenda de abajo de corte ancho se genera segmentada y con dos semillas (wide_cut.py).
 Tras generar, color_match.py acerca el tono de una prenda lisa al de su foto (FASHN a veces lo apaga).
 
 Privacidad: las imágenes viven solo en memoria durante la petición; no se escribe nada a disco.
@@ -29,6 +30,7 @@ import numpy as np
 from PIL import Image
 
 from color_match import LABELS, match_garment_color
+import wide_cut
 
 MAX_BODY = 25 * 1024 * 1024
 CATEGORIES = {"tops", "bottoms", "one-pieces"}
@@ -61,6 +63,13 @@ def _match_color(pipeline, person, garment, image, category: str):
         return match_garment_color(person, garment, image, seg, labels)
     except Exception as exc:  # un ajuste cosmético nunca tumba la prueba
         return image, f"sin ajuste de color ({type(exc).__name__})"
+
+
+def _hem_width(pipeline, image) -> float:
+    from fashn_human_parser import LABELS_TO_IDS
+
+    seg = pipeline.hp_model.predict(np.asarray(image.convert("RGB")))
+    return wide_cut.hem_width(seg, tuple(LABELS_TO_IDS[label] for label in LABELS["bottoms"]))
 
 
 def build_handler(pipeline, lock: threading.Lock):
@@ -103,26 +112,34 @@ def build_handler(pipeline, lock: threading.Lock):
             started = time.perf_counter()
             # Una GPU de portátil no da para dos difusiones a la vez: se atienden en fila.
             with lock:
+                wide = bool(req.get("wideCut")) and category == "bottoms"
+                run = lambda seed, segmentation_free, guidance: pipeline(
+                    person_image=person,
+                    garment_image=garment,
+                    category=category,
+                    garment_photo_type=photo_type,
+                    num_timesteps=int(req.get("steps", 30)),
+                    guidance_scale=guidance,
+                    seed=seed,
+                    segmentation_free=segmentation_free,
+                ).images[0]
+                note = ""
                 try:
-                    result = pipeline(
-                        person_image=person,
-                        garment_image=garment,
-                        category=category,
-                        garment_photo_type=photo_type,
-                        num_timesteps=int(req.get("steps", 30)),
-                        guidance_scale=1.5,
-                        seed=int(req.get("seed", 42)),
-                        segmentation_free=bool(req.get("segmentationFree", True)),
-                    )
+                    if wide:
+                        candidates = [run(seed, False, wide_cut.GUIDANCE) for seed in wide_cut.SEEDS]
+                        best, widths = wide_cut.pick_widest(candidates, lambda img: _hem_width(pipeline, img))
+                        image, note = candidates[best], f"; corte ancho {'/'.join(f'{w:.2f}' for w in widths)}"
+                    else:
+                        image = run(int(req.get("seed", 42)), bool(req.get("segmentationFree", True)), 1.5)
                 except Exception as exc:
                     return self._error(500, f"fallo del modelo: {type(exc).__name__}")
                 finally:
                     peak = _release_vram()
                 # Dentro de la fila: el segmentador es el del pipeline y comparte la GPU.
-                image, color = _match_color(pipeline, person, garment, result.images[0], category)
+                image, color = _match_color(pipeline, person, garment, image, category)
             out = io.BytesIO()
             image.save(out, format="PNG")
-            print(f"[gpu-tryon] {category} en {time.perf_counter() - started:.1f} s (pico VRAM {peak:.1f} GB; {color})", flush=True)
+            print(f"[gpu-tryon] {category} en {time.perf_counter() - started:.1f} s (pico VRAM {peak:.1f} GB; {color}{note})", flush=True)
             self._send(200, out.getvalue(), "image/png")
 
     return Handler

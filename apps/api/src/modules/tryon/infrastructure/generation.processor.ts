@@ -77,7 +77,7 @@ export class GenerationProcessor extends WorkerHost {
             category: garment.category,
             name: garment.name,
             color: garment.color,
-            fit: describeFit(null, garment.category),
+            fit: describeFit(null, garment.category, garment.knownLimitations),
             photoType: photo.photoType,
           },
         ],

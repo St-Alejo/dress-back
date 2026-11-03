@@ -42,6 +42,22 @@ def test_tops_are_not_segmented_so_long_sleeves_are_not_rolled_up():
 
 @respx.mock
 @pytest.mark.parametrize(
+    ("category", "fit", "wide"),
+    [
+        ("bottom", "regular fit; wide-leg cut, loose from hip to hem", True),
+        ("bottom", "regular fit", False),
+        ("top", "regular fit; wide-leg cut, loose from hip to hem", False),
+    ],
+)
+def test_only_wide_leg_bottoms_ask_for_the_wide_cut(category, fit, wide):
+    route = respx.post(f"{URL}/tryon").mock(return_value=httpx.Response(200, content=png()))
+    req = TransferRequest(person=png(size=(200, 300)), garments=[GarmentInput(png(), category, fit=fit)])
+    asyncio.run(LocalGpuProvider(URL).generate(req))
+    assert json.loads(route.calls.last.request.content)["wideCut"] is wide
+
+
+@respx.mock
+@pytest.mark.parametrize(
     ("response", "code"),
     [
         (httpx.Response(400, json={"detail": "x"}), "bad-input"),

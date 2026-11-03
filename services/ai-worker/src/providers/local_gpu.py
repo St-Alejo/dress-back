@@ -17,6 +17,8 @@ from .base import TransferRequest, TryOnProvider
 from .hf_space import GARMENT_BOX, PERSON_BOX, _fit
 
 CATEGORY = {"top": "tops", "outerwear": "tops", "bottom": "bottoms", "dress": "one-pieces"}
+# Lo añade la API al descriptor de ajuste de las prendas de corte ancho (fit-brief.ts).
+WIDE_CUT = "wide-leg cut"
 
 
 def _jpeg_b64(img) -> str:
@@ -28,7 +30,7 @@ def _jpeg_b64(img) -> str:
 class LocalGpuProvider(TryOnProvider):
     name = "local-gpu"
     max_garments = 1
-    # ~50 s por imagen, pero si otra app usa la GPU (Blender, un contenedor) pasa de 2 min:
+    # ~50 s por imagen (el doble con corte ancho: dos semillas), y más si otra app usa la GPU:
     # en la cadena no rige el tope de 120 s de los Spaces.
     max_seconds: float = 200
 
@@ -57,6 +59,8 @@ class LocalGpuProvider(TryOnProvider):
             # Sin segmentar (valor por defecto de FASHN): si se segmenta, una camisa de manga larga
             # sobre una camiseta de manga corta sale remangada, porque solo se repinta la zona de la prenda vieja.
             "segmentationFree": True,
+            # Palazzo, jean ancho: el servidor los genera de otra forma para no copiar el pitillo original.
+            "wideCut": garment.category == "bottom" and WIDE_CUT in garment.fit,
             "steps": 30,
             "seed": 42,
         }

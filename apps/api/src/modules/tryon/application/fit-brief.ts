@@ -42,7 +42,16 @@ const SLEEVE: Record<string, string> = {
   'over-hand': 'sleeves are too long and partly cover the hands',
 };
 
-export function describeFit(a: FitAnalysis | null, category: GarmentCategory): string {
+/** Marca del catálogo para pantalones de corte ancho (palazzo): el motor local los genera aparte. */
+export const WIDE_LEG = 'limitation.wideLeg';
+const WIDE_CUT = 'wide-leg cut, loose and flowing from hip to hem';
+
+export function describeFit(a: FitAnalysis | null, category: GarmentCategory, limitations: string[] = []): string {
+  const fit = describeSize(a, category);
+  return category === 'bottom' && limitations.includes(WIDE_LEG) ? `${fit}; ${WIDE_CUT}` : fit;
+}
+
+function describeSize(a: FitAnalysis | null, category: GarmentCategory): string {
   if (!a) return 'regular fit';
   const parts: string[] = [];
   for (const z of a.zones) parts.push(`${EASE[z.label]} at the ${z.zone}`);
