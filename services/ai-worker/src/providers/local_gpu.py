@@ -28,6 +28,9 @@ def _jpeg_b64(img) -> str:
 class LocalGpuProvider(TryOnProvider):
     name = "local-gpu"
     max_garments = 1
+    # ~50 s por imagen, pero si otra app usa la GPU (Blender, un contenedor) pasa de 2 min:
+    # en la cadena no rige el tope de 120 s de los Spaces.
+    max_seconds: float = 200
 
     def __init__(self, url: str) -> None:
         self.url = url.rstrip("/")

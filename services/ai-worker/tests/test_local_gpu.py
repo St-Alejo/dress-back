@@ -64,3 +64,17 @@ def test_hf_chain_tries_the_local_gpu_first_only_when_configured():
     without = registry.build(Credentials("hf-chain"), Settings(local_tryon_url="", _env_file=None))
     assert [p.name for p in with_gpu.providers][:2] == ["local-gpu", "hf-fashn"]
     assert [p.name for p in without.providers][0] == "hf-fashn"
+
+
+def test_hf_chain_waits_longer_for_the_local_gpu_than_for_a_space():
+    chain = default_registry().build(Credentials("hf-chain"), Settings(local_tryon_url=URL, _env_file=None))
+    gpu = chain.providers[0]
+    seen = []
+
+    async def slow(req):
+        seen.append(gpu.timeout)
+        return png()
+
+    gpu._generate = slow
+    asyncio.run(chain.generate(request()))
+    assert seen == [200]

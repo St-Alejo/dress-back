@@ -231,8 +231,9 @@ class ChainProvider(TryOnProvider):
             if remaining < MIN_ENGINE_SECONDS:
                 raise last or WorkerError("timeout", "los motores tardaron demasiado")
             # Cada proveedor se crea por petición (registry), así que ajustar su plazo no afecta a otras.
+            # Un motor puede pedir otro tope (la GPU local: esperarla vale más que caer a un Space sin cuota).
             if hasattr(provider, "timeout"):
-                provider.timeout = min(remaining, self.per_engine_seconds)
+                provider.timeout = min(remaining, getattr(provider, "max_seconds", self.per_engine_seconds))
             try:
                 image = await provider.generate(req)
                 self.last_used = provider.name
