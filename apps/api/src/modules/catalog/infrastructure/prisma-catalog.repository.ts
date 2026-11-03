@@ -101,6 +101,7 @@ export class PrismaCatalogRepository extends CatalogRepository {
       photoUrl: mediaUrl(b.photoKey),
       previewImages: Object.fromEntries(b.previews.map((p) => [p.garmentId, mediaUrl(p.imageKey)])),
       ...(b.pose ? { pose: b.pose as unknown as BodyPose } : {}),
+      ...(b.onePiece ? { onePiece: true } : {}),
     }));
   }
 
@@ -109,9 +110,9 @@ export class PrismaCatalogRepository extends CatalogRepository {
     return row ? { key: row.photoKey, photoType: row.photoType as GarmentPhotoType } : null;
   }
 
-  async bodyModelPhotoKey(id: string) {
-    const row = await this.prisma.bodyModel.findUnique({ where: { id }, select: { photoKey: true } });
-    return row?.photoKey ?? null;
+  async bodyModelPhoto(id: string) {
+    const row = await this.prisma.bodyModel.findUnique({ where: { id }, select: { photoKey: true, onePiece: true } });
+    return row ? { key: row.photoKey, onePiece: row.onePiece } : null;
   }
 
   async findPreviewKey(bodyModelId: string, garmentId: string) {

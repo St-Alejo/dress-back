@@ -94,6 +94,7 @@ async function main() {
         shape: { ...b.shape },
         photoKey: await publishPhoto('bodies', b.key),
         pose: readJson('bodies', `${b.key}.pose.json`),
+        onePiece: b.onePiece ?? false,
         sortOrder: i,
       },
     });

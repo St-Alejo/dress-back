@@ -144,6 +144,8 @@ model BodyModel {
   photoKey    String
   /// Puntos de pose de la foto (BlazePose, normalizados): para vestir la prenda al instante sin IA.
   pose        Json?
+  /// En la foto lleva una prenda de una pieza (vestido): la IA no le cambia solo la parte de arriba o de abajo.
+  onePiece    Boolean            @default(false)
   sortOrder   Int                @default(0)
   previews    BodyModelPreview[]
 }

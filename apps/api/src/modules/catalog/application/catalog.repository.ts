@@ -16,8 +16,8 @@ export abstract class CatalogRepository {
   abstract listBodyModels(garmentId?: string): Promise<SimilarBodyModel[]>;
   /** Foto real de producto y cómo está tomada: lo que necesita el motor de prueba. */
   abstract garmentPhoto(id: string): Promise<{ key: string; photoType: GarmentPhotoType } | null>;
-  /** Clave de la foto de un modelo de cuerpo. */
-  abstract bodyModelPhotoKey(id: string): Promise<string | null>;
+  /** Foto de un modelo de cuerpo y si en ella lleva vestido (ver aiCanDress). */
+  abstract bodyModelPhoto(id: string): Promise<{ key: string; onePiece: boolean } | null>;
   abstract findPreviewKey(bodyModelId: string, garmentId: string): Promise<string | null>;
   abstract savePreview(bodyModelId: string, garmentId: string, imageKey: string): Promise<void>;
 }

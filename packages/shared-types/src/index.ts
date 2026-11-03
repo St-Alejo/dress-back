@@ -47,6 +47,16 @@ export interface SimilarBodyModel {
   previewImages: Record<string, string>;
   /** Pose y segmentación medidas una vez sobre la foto: permiten la "vista aproximada" al instante. */
   pose?: BodyPose;
+  /** En la foto lleva una prenda de una pieza (vestido): ver `aiCanDress`. */
+  onePiece?: boolean;
+}
+
+/**
+ * Si la IA puede vestir la prenda sobre la foto de este modelo. Sobre un vestido, el motor solo
+ * cambia la mitad de arriba o la de abajo y el resto del vestido sigue ahí (sale una túnica).
+ */
+export function aiCanDress(body: Pick<SimilarBodyModel, 'onePiece'>, category: GarmentCategory): boolean {
+  return !(body.onePiece && (category === 'top' || category === 'bottom'));
 }
 
 /**

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import sharp from 'sharp';
-import type { GarmentCategory } from '@vestirse/shared-types';
+import { aiCanDress, type GarmentCategory } from '@vestirse/shared-types';
 import { mediaUrl } from '../../../common/mappers';
 import { ObjectStorage } from '../../../common/storage';
 import { AiSettingsService } from '../../ai-settings/ai-settings.module';
@@ -48,15 +48,16 @@ export class ModelPreviewService {
   }
 
   private async generate(bodyModelId: string, garmentId: string): Promise<string> {
-    const [garment, photo, bodyKey] = await Promise.all([
+    const [garment, photo, body] = await Promise.all([
       this.catalog.findGarment(garmentId),
       this.catalog.garmentPhoto(garmentId),
-      this.catalog.bodyModelPhotoKey(bodyModelId),
+      this.catalog.bodyModelPhoto(bodyModelId),
     ]);
-    if (!garment || !photo || !bodyKey) throw new NotFoundException();
+    if (!garment || !photo || !body) throw new NotFoundException();
     if (!WEARABLE.has(garment.category)) throw new UnprocessableEntityException('esta prenda no se puede probar sobre un modelo');
+    if (!aiCanDress(body, garment.category)) throw new UnprocessableEntityException('este modelo lleva vestido: la IA no le cambia solo una parte');
 
-    const [person, garmentImage] = await Promise.all([this.storage.getBuffer(bodyKey), this.storage.getBuffer(photo.key)]);
+    const [person, garmentImage] = await Promise.all([this.storage.getBuffer(body.key), this.storage.getBuffer(photo.key)]);
     if (!person || !garmentImage) throw new NotFoundException();
 
     let result;

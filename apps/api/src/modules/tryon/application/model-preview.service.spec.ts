@@ -16,7 +16,7 @@ class FakeTransfer extends GarmentTransferPort {
   }
 }
 
-async function setup(category: GarmentItem['category'] = 'dress') {
+async function setup(category: GarmentItem['category'] = 'dress', onePiece = false) {
   const storage = new MemoryStorage();
   storage.objects.set('catalog/bodies/b1/photo.jpg', Buffer.from('person'));
   storage.objects.set('catalog/garments/g1/photo.jpg', Buffer.from('garment'));
@@ -27,7 +27,7 @@ async function setup(category: GarmentItem['category'] = 'dress') {
   const catalog = {
     findGarment: async () => ({ id: 'g1', name: 'Vestido', category, color: '#ff0000' }) as GarmentItem,
     garmentPhoto: async () => ({ key: 'catalog/garments/g1/photo.jpg', photoType: 'flat-lay' }),
-    bodyModelPhotoKey: async () => 'catalog/bodies/b1/photo.jpg',
+    bodyModelPhoto: async () => ({ key: 'catalog/bodies/b1/photo.jpg', onePiece }),
     findPreviewKey: async (b: string, g: string) => previews.get(`${b}:${g}`) ?? null,
     savePreview: async (b: string, g: string, key: string) => void previews.set(`${b}:${g}`, key),
   } as unknown as CatalogRepository;
@@ -67,5 +67,15 @@ describe('ModelPreviewService', () => {
     const env = await setup('footwear');
     await expect(env.service.ensure('b1', 'g1')).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(env.transfer.calls).toHaveLength(0);
+  });
+
+  it('sobre un modelo con vestido no prueba partes de arriba ni de abajo (saldría una túnica)', async () => {
+    for (const category of ['top', 'bottom'] as const) {
+      const env = await setup(category, true);
+      await expect(env.service.ensure('b1', 'g1')).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(env.transfer.calls).toHaveLength(0);
+    }
+    const jacket = await setup('outerwear', true);
+    await expect(jacket.service.ensure('b1', 'g1')).resolves.toMatchObject({ cached: false });
   });
 });

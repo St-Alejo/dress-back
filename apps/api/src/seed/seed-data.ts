@@ -15,14 +15,16 @@ export interface SeedBody {
   heightRange: [number, number];
   shape: BodyShape;
   skinTone: string;
+  /** Su foto lleva vestido (ver aiCanDress en shared-types). */
+  onePiece?: boolean;
 }
 
 const SKIN = ['#F5D6C6', '#E8B998', '#D39B6F', '#A86B45', '#7D4A2D', '#4F2F1D'];
 
 export const BODIES: SeedBody[] = [
-  { key: 'b01', bodyTypeTag: 'petite-slim', typicalSize: 'XS', heightRange: [150, 158], shape: { heightCm: 154, shoulderCm: 36, chestCm: 80, waistCm: 63, hipCm: 86 }, skinTone: SKIN[1] },
+  { key: 'b01', bodyTypeTag: 'petite-slim', typicalSize: 'XS', heightRange: [150, 158], shape: { heightCm: 154, shoulderCm: 36, chestCm: 80, waistCm: 63, hipCm: 86 }, skinTone: SKIN[1], onePiece: true },
   { key: 'b02', bodyTypeTag: 'petite-curvy', typicalSize: 'M', heightRange: [150, 160], shape: { heightCm: 156, shoulderCm: 38, chestCm: 96, waistCm: 77, hipCm: 104 }, skinTone: SKIN[3] },
-  { key: 'b03', bodyTypeTag: 'average-straight', typicalSize: 'S', heightRange: [162, 170], shape: { heightCm: 166, shoulderCm: 40, chestCm: 87, waistCm: 72, hipCm: 91 }, skinTone: SKIN[5] },
+  { key: 'b03', bodyTypeTag: 'average-straight', typicalSize: 'S', heightRange: [162, 170], shape: { heightCm: 166, shoulderCm: 40, chestCm: 87, waistCm: 72, hipCm: 91 }, skinTone: SKIN[5], onePiece: true },
   { key: 'b04', bodyTypeTag: 'average-curvy', typicalSize: 'L', heightRange: [160, 170], shape: { heightCm: 165, shoulderCm: 39, chestCm: 103, waistCm: 83, hipCm: 110 }, skinTone: SKIN[0] },
   { key: 'b05', bodyTypeTag: 'athletic', typicalSize: 'M', heightRange: [172, 180], shape: { heightCm: 176, shoulderCm: 46, chestCm: 98, waistCm: 78, hipCm: 95 }, skinTone: SKIN[2] },
   { key: 'b06', bodyTypeTag: 'average-broad', typicalSize: 'L', heightRange: [172, 182], shape: { heightCm: 177, shoulderCm: 47, chestCm: 106, waistCm: 92, hipCm: 103 }, skinTone: SKIN[2] },
