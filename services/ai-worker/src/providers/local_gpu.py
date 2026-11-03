@@ -51,8 +51,9 @@ class LocalGpuProvider(TryOnProvider):
             "garment": _jpeg_b64(_fit(garment.image, GARMENT_BOX, "la prenda")),
             "category": CATEGORY[garment.category],
             "photoType": garment.photo_type,
-            # Mismo criterio que en el Space (ver _fashn): las camisetas se segmentan para no heredar mangas.
-            "segmentationFree": garment.category != "top",
+            # Sin segmentar (valor por defecto de FASHN): si se segmenta, una camisa de manga larga
+            # sobre una camiseta de manga corta sale remangada, porque solo se repinta la zona de la prenda vieja.
+            "segmentationFree": True,
             "steps": 30,
             "seed": 42,
         }

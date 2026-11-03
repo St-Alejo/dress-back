@@ -34,10 +34,10 @@ def test_sends_both_images_and_the_fashn_settings():
 
 
 @respx.mock
-def test_tops_are_segmented_like_in_the_space():
+def test_tops_are_not_segmented_so_long_sleeves_are_not_rolled_up():
     route = respx.post(f"{URL}/tryon").mock(return_value=httpx.Response(200, content=png()))
     asyncio.run(LocalGpuProvider(URL).generate(request("top")))
-    assert json.loads(route.calls.last.request.content)["segmentationFree"] is False
+    assert json.loads(route.calls.last.request.content)["segmentationFree"] is True
 
 
 @respx.mock

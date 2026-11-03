@@ -36,4 +36,9 @@ LOCAL_TRYON_URL=http://127.0.0.1:8020
 Con la API en `AI_PROVIDER=hf-chain`, las pruebas «Con tu foto» y «Cuerpo similar» se generan en la GPU.
 Comprobación rápida: `curl http://127.0.0.1:8020/health`.
 
+En una RTX 4070 Laptop tarda ~50 s por imagen. El modelo ocupa ~7 GB de VRAM: con otra app usando
+la GPU (Blender, juegos) Windows pasa a memoria compartida y una imagen puede tardar varios minutos.
+En Windows, DWPose corre en CPU si onnxruntime no encuentra CUDA 13 (aviso en el arranque); no afecta
+al resultado.
+
 Escucha solo en `127.0.0.1` por defecto: no lo expongas a Internet sin autenticación.
