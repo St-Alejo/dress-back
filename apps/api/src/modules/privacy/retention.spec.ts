@@ -18,6 +18,7 @@ describe('RetentionService (sección 8)', () => {
   let sessions: MemorySessions;
   let userDeleted: string | undefined;
   let profilePhoto: string | null;
+  let favoriteImages: string[];
   let service: RetentionService;
 
   beforeEach(async () => {
@@ -25,9 +26,11 @@ describe('RetentionService (sección 8)', () => {
     sessions = new MemorySessions();
     userDeleted = undefined;
     profilePhoto = null;
+    favoriteImages = [];
     const prisma = {
       user: { delete: async ({ where }: { where: { id: string } }) => (userDeleted = where.id) },
       bodyProfile: { findUnique: async () => (profilePhoto ? { photoKey: profilePhoto } : null) },
+      favoriteOutfit: { findMany: async () => favoriteImages.map((imageKey) => ({ imageKey })) },
     } as unknown as PrismaService;
     service = new RetentionService(sessions, storage, prisma);
   });
@@ -62,6 +65,14 @@ describe('RetentionService (sección 8)', () => {
     const result = await service.deleteAccount('u1');
     expect(result.deletedObjects).toBe(1);
     expect(storage.objects.has(profilePhoto)).toBe(false);
+  });
+
+  it('borrar la cuenta también borra las imágenes de sus conjuntos favoritos', async () => {
+    favoriteImages = ['saved/favorites/u1/a.png', 'saved/favorites/u1/b.png'];
+    for (const k of favoriteImages) await storage.put(k, Buffer.from('f'));
+    const result = await service.deleteAccount('u1');
+    expect(result.deletedObjects).toBe(2);
+    expect(storage.objects.size).toBe(0);
   });
 
   it('el TTL prometido nunca supera la regla de borrado del bucket, y las fotos anónimas viven en ese prefijo', () => {

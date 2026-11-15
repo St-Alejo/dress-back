@@ -45,7 +45,12 @@ export class RetentionService {
   async deleteAccount(userId: string) {
     const sessions = await this.sessions.findByUser(userId);
     const profile = await this.prisma.bodyProfile.findUnique({ where: { userId }, select: { photoKey: true } });
-    const keys = [...sessions.flatMap((s) => [s.snapshot.photoKey, s.snapshot.resultKey]), profile?.photoKey].filter((k): k is string => !!k);
+    const favorites = await this.prisma.favoriteOutfit.findMany({ where: { userId }, select: { imageKey: true } });
+    const keys = [
+      ...sessions.flatMap((s) => [s.snapshot.photoKey, s.snapshot.resultKey]),
+      profile?.photoKey,
+      ...favorites.map((f) => f.imageKey),
+    ].filter((k): k is string => !!k);
     await this.storage.deleteMany(keys);
     await this.prisma.user.delete({ where: { id: userId } });
     return { deletedObjects: keys.length, deletedSessions: sessions.length };

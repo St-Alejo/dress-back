@@ -185,6 +185,25 @@ export interface OutfitItem {
   size: string;
 }
 
+/** Prenda de un conjunto favorito: la talla probada y la que se le recomendaba a esa persona. */
+export interface FavoriteOutfitItem {
+  garment: GarmentItem;
+  size: string;
+  recommendedSize?: string;
+}
+
+/** Conjunto guardado en "Mis favoritos": la prueba con IA y sus prendas. */
+export interface FavoriteOutfit {
+  id: string;
+  title: string;
+  /** Quién lo lleva (p. ej. "Él", "Ella"). */
+  wearer?: string;
+  note?: string;
+  imageUrl: string;
+  items: FavoriteOutfitItem[];
+  createdAt: string;
+}
+
 /**
  * Motores de prueba virtual. `hf-*` son Spaces gratuitos de Hugging Face (`hf-chain` los
  * prueba en orden); `fal-catvton` y `replicate` son APIs de pago; `mock` no usa IA.

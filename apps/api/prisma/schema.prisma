@@ -64,6 +64,7 @@ model User {
   sessions          TryOnSession[]
   reviews           FitReview[]
   profile           BodyProfile?
+  favorites         FavoriteOutfit[]
 }
 
 /// Perfil corporal guardado por decisión explícita de la persona (ADR 0004). Sin consentimiento no
@@ -83,6 +84,28 @@ model BodyProfile {
   photoKey   String?
   consentAt  DateTime
   updatedAt  DateTime @updatedAt
+}
+
+/// Conjunto guardado en "Mis favoritos": la imagen probada con IA y las prendas con su talla.
+/// Es de la cuenta (como un resultado guardado): no lo toca el TTL; borrar la cuenta lo borra.
+model FavoriteOutfit {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  /// Quién lo lleva (p. ej. "Él", "Ella"): una cuenta puede probar para su familia.
+  wearer      String?
+  /// Modelo de cuerpo usado, si no fue una foto propia.
+  bodyModelId String?
+  /// Clave en el almacenamiento, bajo saved/ (fuera del TTL de 24 h).
+  imageKey    String
+  /// [{ garmentId, size, recommendedSize? }]
+  items       Json
+  /// Lo que muestra la prueba (p. ej. "talla L sobre una M: queda holgada").
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Brand {
