@@ -10,6 +10,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:demo": "tsx prisma/seed-demo.ts",
     "test": "jest",
     "test:invariants": "jest invariants",
     "lint": "tsc --noEmit -p tsconfig.json"

@@ -43,6 +43,13 @@ npm run dev:api                   # http://localhost:3000/api (el front, en su r
 ```
 
 Admin de demo: `admin@vestirse.local` / `admin1234` (cámbialo con `ADMIN_EMAIL` / `ADMIN_PASSWORD` antes del seed).
+Cuenta demo: `demo@vestirse.local` / `demo12345` (`DEMO_EMAIL` / `DEMO_PASSWORD`), con perfil ya cargado
+(foto de un modelo del catálogo y medidas estimadas por la IA). `npm run db:seed:demo` la crea sola, sin
+borrar el catálogo ni las pruebas generadas.
+
+Medidas con IA (opcional, de pago): en `services/ai-worker/.env` poner `VISION_PROVIDER=openai`,
+`OPENAI_API_KEY` y `OPENAI_BUDGET_USD` (tope de gasto acumulado; ver ADR 0004). Sin key, la talla sale de
+la altura y las medidas escritas, como antes.
 
 > Los puertos de Postgres y Redis del host son 55432 y 6380 para no chocar con instalaciones locales.
 > Se usa **RustFS** como S3 local porque las imágenes oficiales de MinIO ya no se publican.

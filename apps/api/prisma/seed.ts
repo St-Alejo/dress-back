@@ -9,6 +9,7 @@ import { S3ObjectStorage } from '../src/common/storage';
 import { fitIntentFor } from '../src/modules/catalog/domain/garment-grading';
 import { sizeRows } from '../src/modules/catalog/infrastructure/size-rows';
 import { BODIES, BRANDS, GARMENTS } from '../src/seed/seed-data';
+import { seedDemoAccount } from './demo-account';
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 const storage = new S3ObjectStorage(new ConfigService(process.env));
@@ -108,7 +109,9 @@ async function main() {
     create: { email: adminEmail, passwordHash: await argon2.hash(process.env.ADMIN_PASSWORD ?? 'admin1234'), role: 'admin' },
   });
 
-  console.log(`seed: ${BRANDS.length} marcas, ${GARMENTS.length} prendas, ${BODIES.length} cuerpos, admin ${adminEmail}`);
+  const demoEmail = await seedDemoAccount(prisma, storage, PHOTOS_DIR);
+
+  console.log(`seed: ${BRANDS.length} marcas, ${GARMENTS.length} prendas, ${BODIES.length} cuerpos, admin ${adminEmail}, demo ${demoEmail}`);
 }
 
 main()
