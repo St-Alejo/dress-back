@@ -17,13 +17,18 @@ describe('RetentionService (sección 8)', () => {
   let storage: MemoryStorage;
   let sessions: MemorySessions;
   let userDeleted: string | undefined;
+  let profilePhoto: string | null;
   let service: RetentionService;
 
   beforeEach(async () => {
     storage = new MemoryStorage();
     sessions = new MemorySessions();
     userDeleted = undefined;
-    const prisma = { user: { delete: async ({ where }: { where: { id: string } }) => (userDeleted = where.id) } } as unknown as PrismaService;
+    profilePhoto = null;
+    const prisma = {
+      user: { delete: async ({ where }: { where: { id: string } }) => (userDeleted = where.id) },
+      bodyProfile: { findUnique: async () => (profilePhoto ? { photoKey: profilePhoto } : null) },
+    } as unknown as PrismaService;
     service = new RetentionService(sessions, storage, prisma);
   });
 
@@ -49,6 +54,14 @@ describe('RetentionService (sección 8)', () => {
     expect(result.deletedObjects).toBe(2);
     expect(userDeleted).toBe('u1');
     expect([...storage.objects.keys()].every((k) => k.includes('/other/'))).toBe(true);
+  });
+
+  it('borrar la cuenta también borra la foto del perfil guardado', async () => {
+    profilePhoto = 'saved/profiles/u1/p.jpg';
+    await storage.put(profilePhoto, Buffer.from('p'));
+    const result = await service.deleteAccount('u1');
+    expect(result.deletedObjects).toBe(1);
+    expect(storage.objects.has(profilePhoto)).toBe(false);
   });
 
   it('el TTL prometido nunca supera la regla de borrado del bucket, y las fotos anónimas viven en ese prefijo', () => {

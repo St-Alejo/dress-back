@@ -19,6 +19,7 @@ import { FitModule } from './modules/fit/fit.module';
 import { HealthModule } from './modules/health/health.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
+import { ProfileModule } from './modules/profile/profile.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { TryOnModule } from './modules/tryon/tryon.module';
 
@@ -54,6 +55,7 @@ import { TryOnModule } from './modules/tryon/tryon.module';
     FitModule,
     TryOnModule,
     PrivacyModule,
+    ProfileModule,
     ReviewsModule,
     AuthModule,
     AdminModule,

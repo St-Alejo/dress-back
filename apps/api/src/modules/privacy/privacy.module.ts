@@ -44,7 +44,8 @@ export class RetentionService {
   /** Borrado de cuenta = borrado real de fotos y resultados en el almacenamiento (sección 8.5). */
   async deleteAccount(userId: string) {
     const sessions = await this.sessions.findByUser(userId);
-    const keys = sessions.flatMap((s) => [s.snapshot.photoKey, s.snapshot.resultKey]).filter((k): k is string => !!k);
+    const profile = await this.prisma.bodyProfile.findUnique({ where: { userId }, select: { photoKey: true } });
+    const keys = [...sessions.flatMap((s) => [s.snapshot.photoKey, s.snapshot.resultKey]), profile?.photoKey].filter((k): k is string => !!k);
     await this.storage.deleteMany(keys);
     await this.prisma.user.delete({ where: { id: userId } });
     return { deletedObjects: keys.length, deletedSessions: sessions.length };

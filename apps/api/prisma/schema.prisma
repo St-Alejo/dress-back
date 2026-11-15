@@ -63,6 +63,26 @@ model User {
   createdAt         DateTime       @default(now())
   sessions          TryOnSession[]
   reviews           FitReview[]
+  profile           BodyProfile?
+}
+
+/// Perfil corporal guardado por decisión explícita de la persona (ADR 0004). Sin consentimiento no
+/// existe; quitarlo o borrar la cuenta borra la fila y la foto. Fuera de aquí las medidas no se guardan.
+model BodyProfile {
+  userId     String   @id
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  heightCm   Float
+  weightKg   Float?
+  chestCm    Float?
+  waistCm    Float?
+  hipCm      Float?
+  shoulderCm Float?
+  /// Medidas que estimó la IA (las escritas por la persona las reemplazan y salen de aquí).
+  aiFields   String[] @default([])
+  /// Clave en el almacenamiento, fuera de `uploads/` para que no la borre el TTL de 24 h.
+  photoKey   String?
+  consentAt  DateTime
+  updatedAt  DateTime @updatedAt
 }
 
 model Brand {

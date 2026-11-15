@@ -278,6 +278,32 @@ export interface BodyEstimate {
   confidence?: 'low' | 'medium' | 'high';
 }
 
+export type ProfileMeasure = 'chestCm' | 'waistCm' | 'hipCm' | 'shoulderCm';
+
+/**
+ * Perfil corporal guardado en la cuenta, SOLO con consentimiento explícito (ADR 0004).
+ * `aiFields` dice qué medidas estimó la IA; las escritas por la persona no aparecen ahí.
+ */
+export interface SavedProfile {
+  heightCm: number;
+  weightKg?: number;
+  chestCm?: number;
+  waistCm?: number;
+  hipCm?: number;
+  shoulderCm?: number;
+  aiFields: ProfileMeasure[];
+  hasPhoto: boolean;
+  consentAt: string;
+  updatedAt: string;
+}
+
+/** Respuesta al subir la foto del perfil: aviso de encuadre y lo que midió la IA. */
+export interface ProfilePhotoResult {
+  profile: SavedProfile;
+  photoCheck?: PhotoCheck;
+  estimate: BodyEstimate;
+}
+
 /** Sugerencias de etiquetado de una prenda a partir de su foto (panel de admin). */
 export interface GarmentSuggestion {
   style?: string;

@@ -4,6 +4,8 @@
  */
 import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FORBIDDEN_ROUTE_PATTERN, LETTER_SIZES } from '@vestirse/shared-types';
@@ -15,13 +17,14 @@ import { BodyGeometry, REFERENCE_SHAPE } from './modules/catalog/domain/body-geo
 import { FitController } from './modules/fit/fit.module';
 import { MetricsController } from './modules/metrics/metrics.module';
 import { PrivacyController } from './modules/privacy/privacy.module';
+import { ProfileController, ProfileDto } from './modules/profile/profile.module';
 import { ReviewsController } from './modules/reviews/reviews.module';
 import { TryOnController } from './modules/tryon/interface/tryon.controller';
 import { BODIES } from './seed/seed-data';
 
 const CONTROLLERS = [
   AdminController, AuthController, CatalogController, MediaController, FitController,
-  MetricsController, PrivacyController, ReviewsController, TryOnController,
+  MetricsController, PrivacyController, ProfileController, ReviewsController, TryOnController,
 ];
 
 function routesOf(controller: new (...args: never[]) => unknown): string[] {
@@ -80,6 +83,13 @@ describe('invariantes éticas de la API', () => {
   it('regla 2: la geometría del cuerpo solo acepta medidas reales, sin parámetros de "estilizar"', () => {
     expect(Object.keys(REFERENCE_SHAPE).sort()).toEqual(['chestCm', 'heightCm', 'hipCm', 'shoulderCm', 'waistCm']);
     expect(Object.getOwnPropertyNames(BodyGeometry.prototype).filter((n) => /slim|reshape|thin|beautif/i.test(n))).toEqual([]);
+  });
+
+  it('ADR 0004: el perfil con foto y medidas solo se guarda con un sí explícito', () => {
+    const errors = (body: object) => validateSync(plainToInstance(ProfileDto, body)).length;
+    expect(errors({ heightCm: 170 })).toBeGreaterThan(0);
+    expect(errors({ consent: false, heightCm: 170 })).toBeGreaterThan(0);
+    expect(errors({ consent: true, heightCm: 170 })).toBe(0);
   });
 
   it('sección 8.4: el consentimiento de reentrenamiento es false por defecto en el esquema', () => {
