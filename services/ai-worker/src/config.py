@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # Tope de gasto acumulado (USD) y archivo donde se lleva la cuenta entre reinicios.
     openai_budget_usd: float = 0.20
     openai_spend_file: str = ".openai-spend.json"
+    # Acabado con IA de imagen (POST /v1/finish): realismo, talla y zapatos sobre el resultado del probador.
+    openai_image_model: str = "gpt-image-1-mini"
+    openai_image_quality: str = "medium"
     # Adaptadores heredados: se pueden configurar por entorno además de por cabecera.
     fal_key: str = ""
     fal_model: str = "fal-ai/cat-vton"

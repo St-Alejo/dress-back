@@ -1,4 +1,5 @@
 import hmac
+import io
 import json
 import time
 from functools import lru_cache
@@ -7,11 +8,13 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, File, Form, Header, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import Response
-from pydantic import ValidationError
+from PIL import Image
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .config import Settings
-from .contract import CONTRACT_VERSION, Manifest, WorkerError, worker_error_handler
+from .contract import CONTRACT_VERSION, Category, Manifest, WorkerError, worker_error_handler
 from .providers import Credentials, GarmentInput, ProviderRegistry, TransferRequest, TryOnProvider, default_registry
+from .finish import FinishUnavailable, ImageFinisher, OutfitPiece
 from .vision import ClaudeVision, FallbackVision, GroqVision, OpenAIVision, SpendMeter, VisionClient, VisionUnavailable
 
 app = FastAPI(title="Vestirse AI worker", version="1.0.0")
@@ -37,6 +40,12 @@ def get_registry() -> ProviderRegistry:
 
 
 @lru_cache
+def _meter(path: str, budget: float) -> SpendMeter:
+    # Un solo contador por archivo: visión y acabado de imagen suman al mismo tope de gasto.
+    return SpendMeter(path, budget)
+
+
+@lru_cache
 def _vision(
     provider: str,
     groq_key: str,
@@ -53,7 +62,7 @@ def _vision(
     if provider == "claude":
         return FallbackVision([ClaudeVision(claude_key, claude_model), groq])
     if provider == "openai":
-        meter = SpendMeter(openai_spend_file, openai_budget)
+        meter = _meter(openai_spend_file, openai_budget)
         return FallbackVision([OpenAIVision(openai_key, openai_model, meter), groq])
     return groq
 
@@ -69,6 +78,15 @@ def get_vision(settings: Annotated[Settings, Depends(get_settings)]) -> VisionCl
         settings.openai_vision_model,
         settings.openai_budget_usd,
         settings.openai_spend_file,
+    )
+
+
+def get_finisher(settings: Annotated[Settings, Depends(get_settings)]) -> ImageFinisher:
+    return ImageFinisher(
+        settings.openai_api_key,
+        settings.openai_image_model,
+        settings.openai_image_quality,
+        _meter(settings.openai_spend_file, settings.openai_budget_usd),
     )
 
 
@@ -209,3 +227,59 @@ async def estimate_body(
         return {"checked": True, **await vision.estimate_body(data, height_cm)}
     except VisionUnavailable:
         return {"checked": False, "usable": False, "reason": None}
+
+
+class FinishPiece(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    index: Annotated[int, Field(ge=0, le=4)]
+    category: Category
+    name: Annotated[str, Field(min_length=1, max_length=120)]
+    # Tallas de diferencia con la recomendada (+1 = una más grande).
+    delta: Annotated[int, Field(ge=-3, le=3)] = 0
+
+
+class FinishManifest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pieces: Annotated[list[FinishPiece], Field(min_length=1, max_length=5)]
+
+
+@app.post("/v1/finish", dependencies=[Depends(require_token)])
+async def finish(
+    person_image: Annotated[UploadFile, File()],
+    item_images: Annotated[list[UploadFile], File()],
+    manifest: Annotated[str, Form()],
+    finisher: Annotated[ImageFinisher, Depends(get_finisher)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Response:
+    """
+    Acabado de un resultado del probador con IA de imagen (de pago, con tope): tela realista, la talla
+    elegida (holgada o ajustada) y los zapatos del conjunto. Devuelve un PNG vertical.
+    """
+    try:
+        meta = FinishManifest.model_validate_json(manifest)
+    except ValidationError as exc:
+        raise WorkerError("bad-input", "manifest inválido") from exc
+    if any(p.index >= len(item_images) for p in meta.pieces):
+        raise WorkerError("bad-input", "índice de prenda fuera de rango")
+    if not finisher.configured:
+        raise WorkerError("not-configured", "acabado con IA sin clave de OpenAI")
+    person = await _read_limited(person_image, settings.max_upload_bytes, "persona")
+    items = [await _read_limited(f, settings.max_upload_bytes, f"prenda {i}") for i, f in enumerate(item_images)]
+    pieces = [OutfitPiece(p.category, p.name, items[p.index], p.delta) for p in meta.pieces]
+    started = time.perf_counter()
+    try:
+        result = await finisher.finish_outfit(Image.open(io.BytesIO(person)).convert("RGB"), pieces)
+    except FinishUnavailable as exc:
+        code = "content-policy" if "safety" in str(exc) else "not-configured" if "tope" in str(exc) else "provider-error"
+        raise WorkerError(code, str(exc)[:160]) from exc
+    except OSError as exc:
+        raise WorkerError("bad-input", "imagen ilegible") from exc
+    out = io.BytesIO()
+    result.save(out, "PNG")
+    return Response(
+        content=out.getvalue(),
+        media_type="image/png",
+        headers={"X-Engine": f"openai:{finisher.model}", "X-Duration-Ms": str(int((time.perf_counter() - started) * 1000))},
+    )
