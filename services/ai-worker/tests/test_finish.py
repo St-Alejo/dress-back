@@ -97,7 +97,7 @@ def test_finish_sends_person_items_and_mask_and_counts_the_cost():
     out = asyncio.run(finisher(edits_reply(seen), meter).finish_outfit(studio_photo(), PIECES))
     assert out.size == (1024, 1536)
     body = seen[0].content
-    assert body.count(b'name="image[]"') == 4 and b'name="mask"' in body
+    assert body.count(b'name="image[]"') == 4 and b'name="mask"' not in body
     assert b"gpt-image-1-mini" in body and b"1024x1536" in body
     # 400 texto x 2 + 2600 imagen x 2,5 + 1000 salida x 8 (USD por millón)
     assert meter.spent == pytest.approx((400 * 2 + 2600 * 2.5 + 1000 * 8) / 1_000_000)
@@ -172,3 +172,8 @@ def test_endpoint_maps_errors_to_the_contract(make_client):
     bad = {"pieces": [{"index": 5, "category": "top", "name": "x"}]}
     assert client.post("/v1/finish", **finish_form(bad)).status_code == 400
     assert client.post("/v1/finish", **finish_form({"pieces": []})).status_code == 400
+
+
+def test_a_dress_is_worn_alone_without_trousers():
+    text = outfit_prompt([OutfitPiece("dress", "Vestido floral", b"", -1)])
+    assert "one-piece dress worn on its own" in text and "no trousers" in text

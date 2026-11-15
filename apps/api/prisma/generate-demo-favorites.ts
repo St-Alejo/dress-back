@@ -3,7 +3,7 @@
  * las imágenes quedan en seed/favorites/ y `db:seed:demo` las carga sin volver a gastar.
  *
  *   npx tsx prisma/generate-demo-favorites.ts            # genera los que falten
- *   npx tsx prisma/generate-demo-favorites.ts --only=id  # rehace uno (p. ej. si salió mal)
+ *   npx tsx prisma/generate-demo-favorites.ts --only=a,b [--refinish]  # rehace esos (--refinish: solo el acabado)
  *
  * Cada escenario: talla recomendada con el motor de tallas para esa persona, la talla probada
  * (la recomendada ± n) → FASHN en la GPU local viste prenda a prenda → acabado con IA de imagen
@@ -107,13 +107,17 @@ async function generate(s: DemoScenario, byKey: Map<string, DbGarment>) {
   });
   const ordered = [...items].sort((a, b) => AI_DRESSING_ORDER[a.garment.category] - AI_DRESSING_ORDER[b.garment.category]);
 
-  let person: Buffer = readFileSync(join(SEED, 'photos/bodies', `${s.body}.jpg`));
-  for (const [step, it] of ordered.filter((i) => AI_WEARABLE.includes(i.garment.category)).entries()) {
+  const saved = join(OUT, `${s.id}.fashn.png`);
+  // --refinish: repite solo el acabado sobre el resultado de FASHN ya guardado (sin usar la GPU).
+  const reuse = process.argv.includes('--refinish') && existsSync(saved);
+  let person: Buffer = readFileSync(reuse ? saved : join(SEED, 'photos/bodies', `${s.body}.jpg`));
+  const wearable = reuse ? [] : ordered.filter((i) => AI_WEARABLE.includes(i.garment.category));
+  for (const [step, it] of wearable.entries()) {
     const t = Date.now();
     person = await fashn(person, it.garment, it.image, `demo-${s.id}-${step}`);
     console.log(`  FASHN ${it.garment.name} (${Math.round((Date.now() - t) / 1000)} s)`);
   }
-  writeFileSync(join(OUT, `${s.id}.fashn.png`), person);
+  writeFileSync(saved, person);
   const t = Date.now();
   const final = await finish(person, ordered.map((i) => ({ image: i.image, category: i.garment.category, name: i.garment.name, delta: i.delta })), `demo-${s.id}-finish`);
   console.log(`  acabado (${Math.round((Date.now() - t) / 1000)} s)`);
@@ -129,7 +133,7 @@ async function generate(s: DemoScenario, byKey: Map<string, DbGarment>) {
 }
 
 async function main() {
-  const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
+  const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7).split(',');
   mkdirSync(OUT, { recursive: true });
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
   try {
@@ -140,8 +144,7 @@ async function main() {
     const manifest: Record<string, unknown>[] = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : [];
     for (const s of DEMO_SCENARIOS) {
       const done = existsSync(join(OUT, `${s.id}.jpg`)) && manifest.some((m) => m.id === s.id);
-      if (done && only !== s.id) continue;
-      if (only && only !== s.id) continue;
+      if (only ? !only.includes(s.id) : done) continue;
       console.log(`${s.id}: ${s.title}`);
       try {
         const entry = await generate(s, byKey);

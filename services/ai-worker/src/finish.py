@@ -12,7 +12,8 @@ las fotos de catálogo de cada prenda y:
 Lecciones de las pruebas reales (nov-2026):
 - Editar solo una zona y pegarla sobre la original deja fantasmas: la IA redibuja a la persona entera
   (también la postura de las piernas). Se usa su imagen completa, que además es la más realista.
-- La máscara protege la cabeza: la cara se conserva.
+- Sin máscara: con un rectángulo editable la IA a veces oscurecía el fondo fuera de él (viñeta).
+  El texto pide la misma cara y el fondo claro de estudio.
 - El filtro de seguridad rechaza frases como "do not add or remove garments" (suena a desvestir); el
   texto solo habla de retocar la ropa del catálogo.
 """
@@ -88,14 +89,18 @@ def outfit_prompt(pieces: list[OutfitPiece]) -> str:
                 line += f": it is {steps} too small for this person, so it fits tight ({TIGHT[p.category]})"
         else:
             line += ": it fits this person true to size"
+        if p.category == "dress":
+            # Sin esto, a veces lo dibujaba como túnica sobre el pantalón que la persona llevaba en la foto.
+            line += "; it is a one-piece dress worn on its own, with bare legs below the hem and no trousers"
         lines.append(line + ".")
     return (
         "Fashion e-commerce catalog photo of a model wearing an outfit. Retouch the clothes so they look "
         "like a real photograph: natural fabric texture, folds and drape, true colors and patterns of each product, "
         "realistic seams, collar and buttons.\n"
         + "\n".join(lines)
-        + "\nKeep the model, pose, plain studio background, "
-        "framing and camera distance unchanged. Same outfit, only these pieces."
+        + "\nKeep the same model (same face and hair), pose, framing and camera distance. Background: the same "
+        "bright off-white plain studio wall, evenly lit, with no vignette, no dark edges and no glow. "
+        "Same outfit, only these pieces."
     )
 
 
@@ -221,8 +226,8 @@ class ImageFinisher:
     async def finish_outfit(self, person: Image.Image, pieces: list[OutfitPiece]) -> Image.Image:
         """Acabado de todo el conjunto en UNA edición (~0,017 USD con gpt-image-1-mini). PNG 1024x1536."""
         pieces = pieces[:MAX_PIECES]
-        canvas, offset = portrait_canvas(person)
+        canvas, _ = portrait_canvas(person)
         images = [("person.png", _png(canvas), "image/png")]
         images += [(f"item{i}.jpg", _jpeg(Image.open(io.BytesIO(p.image)), 640), "image/jpeg") for i, p in enumerate(pieces)]
-        mask = edit_mask(canvas.size, outfit_zone(person, offset))
-        return await self._edit(images, outfit_prompt(pieces), "1024x1536", mask=mask)
+        # Sin máscara: con un rectángulo editable la IA a veces pintaba una viñeta oscura fuera de él.
+        return await self._edit(images, outfit_prompt(pieces), "1024x1536")
