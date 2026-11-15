@@ -84,6 +84,10 @@ export class ManualMeasurementsStrategy implements FitStrategy {
       // La medida más restrictiva domina: una prenda que no cierra en cintura no sirve aunque el pecho encaje.
       scores[size] = perKey.length ? Math.min(...perKey) : 0;
     }
+    // Estimadas por la IA a partir de una foto: valen menos que la cinta métrica y así se dice.
+    if (measurements.estimatedFromPose) {
+      return { scores, weight: 2, evidence: 'estimated', basis: ['fit.basis.estimatedFromPhoto', 'fit.basis.detailedChart'], outsideChart };
+    }
     return {
       scores,
       weight: 3,

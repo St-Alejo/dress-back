@@ -25,6 +25,18 @@ describe('rangeScore', () => {
 });
 
 describe('FitEngine', () => {
+  it('medidas estimadas por foto: misma talla, confianza media y lo dice', () => {
+    const rec = engine.recommend({
+      measurements: { heightCm: 175, chestCm: 96, waistCm: 80, estimatedFromPose: true },
+      sizeChart: detailedTop,
+      category: 'top',
+    });
+    expect(rec.recommendedSize).toBe('M');
+    expect(rec.confidence).toBe('medium');
+    expect(rec.basis).toContain('fit.basis.estimatedFromPhoto');
+    expect(rec.basis).not.toContain('fit.basis.chestProvided');
+  });
+
   it('confianza alta con medidas y tabla detallada', () => {
     const rec = engine.recommend({
       measurements: { heightCm: 175, chestCm: 96, waistCm: 80 },

@@ -1,9 +1,26 @@
-import { Body, Controller, HttpCode, Injectable, Module, NotFoundException, Post, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  HttpCode,
+  Injectable,
+  Module,
+  NotFoundException,
+  Post,
+  UnprocessableEntityException,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { BrandCalibration, FitEngine, SizeChart } from '@vestirse/fit-engine';
-import type { EstimatedBody, FitAnalysis, FitRecommendation, GarmentCategory, Silhouette } from '@vestirse/shared-types';
+import type { BodyEstimate, EstimatedBody, FitAnalysis, FitRecommendation, GarmentCategory, Silhouette } from '@vestirse/shared-types';
+import { cleanPhoto, MAX_PHOTO_BYTES, type UploadedPhoto } from '../../common/photo';
 import { PrismaService } from '../../common/prisma.service';
+import { ObjectStorage } from '../../common/storage';
+import { AiSettingsModule, AiWorkerClient } from '../ai-settings/ai-settings.module';
 import { CurrentRequester, type Requester } from '../../common/requester';
 import { CatalogModule } from '../catalog/catalog.module';
 import { CatalogRepository } from '../catalog/application/catalog.repository';
@@ -68,6 +85,12 @@ class EstimateFitDto {
   @IsOptional() @IsUUID() sessionId?: string;
 }
 
+/** Campos de texto del formulario multipart de /fit/measure. */
+class MeasureDto {
+  @Type(() => Number) @IsNumber() @Min(120) @Max(230) heightCm: number;
+  @IsOptional() @IsUUID() sessionId?: string;
+}
+
 class OverrideDto {
   @IsUUID() garmentId: string;
   @IsString() @MaxLength(10) recommendedSize: string;
@@ -84,7 +107,29 @@ export class FitService {
     private readonly calibration: CalibrationRepository,
     private readonly sessions: TryOnSessionRepository,
     private readonly metrics: MetricsService,
+    private readonly worker: AiWorkerClient,
+    private readonly storage: ObjectStorage,
   ) {}
+
+  /**
+   * "Medirme con IA": estima contornos a partir de una foto (la que llega en la petición
+   * o la ya subida a una sesión) y la altura declarada. La foto nueva solo vive en memoria
+   * durante la petición y las medidas no se guardan: vuelven a la persona, que decide usarlas.
+   */
+  async measure(file: UploadedPhoto | undefined, dto: MeasureDto, requester: Requester): Promise<BodyEstimate> {
+    let image: Buffer | null;
+    if (dto.sessionId && !file) {
+      const session = await this.sessions.findOwned(dto.sessionId, requester);
+      if (!session) throw new NotFoundException();
+      if (!session.photoKey) throw new BadRequestException('la sesión no tiene foto');
+      image = await this.storage.getBuffer(session.photoKey);
+      if (!image) throw new BadRequestException('la foto ya expiró');
+    } else {
+      image = await cleanPhoto(file);
+    }
+    const estimate = await this.worker.estimateBody(image, dto.heightCm);
+    return estimate;
+  }
 
   /** Caso de uso EstimateFit (Track C). Las medidas no se persisten: solo la recomendación. */
   async estimate(dto: EstimateFitDto, requester: Requester): Promise<FitRecommendation> {
@@ -172,6 +217,13 @@ export class FitController {
     return this.fit.analyze(dto);
   }
 
+  @Post('measure')
+  @HttpCode(200)
+  @UseInterceptors(FileInterceptor('photo', { storage: memoryStorage(), limits: { fileSize: MAX_PHOTO_BYTES, files: 1 } }))
+  measure(@UploadedFile() file: Express.Multer.File | undefined, @Body() dto: MeasureDto, @CurrentRequester() requester: Requester) {
+    return this.fit.measure(file, dto, requester);
+  }
+
   @Post('override')
   override(@Body() dto: OverrideDto, @CurrentRequester() requester: Requester) {
     return this.fit.override(dto, requester);
@@ -179,7 +231,7 @@ export class FitController {
 }
 
 @Module({
-  imports: [CatalogModule, TryOnSessionsPersistenceModule],
+  imports: [CatalogModule, TryOnSessionsPersistenceModule, AiSettingsModule],
   controllers: [FitController],
   providers: [FitService, { provide: CalibrationRepository, useClass: PrismaCalibrationRepository }],
 })

@@ -263,6 +263,21 @@ export interface PhotoCheck {
   reason?: PhotoCheckReason | null;
 }
 
+export type BodyEstimateReason = 'no-person' | 'multiple-people' | 'not-full-body' | 'not-frontal' | 'baggy-clothes';
+
+/**
+ * Medidas estimadas por la IA a partir de una foto y la altura declarada, solo para
+ * recomendar talla. `checked: false` = no se pudo analizar (la talla sale de la altura).
+ * Las medidas que la persona escribe siempre mandan sobre estas.
+ */
+export interface BodyEstimate {
+  checked: boolean;
+  usable: boolean;
+  reason?: BodyEstimateReason | null;
+  measurements?: { chestCm?: number; waistCm?: number; hipCm?: number; shoulderCm?: number };
+  confidence?: 'low' | 'medium' | 'high';
+}
+
 /** Sugerencias de etiquetado de una prenda a partir de su foto (panel de admin). */
 export interface GarmentSuggestion {
   style?: string;

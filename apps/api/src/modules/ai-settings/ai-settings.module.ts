@@ -7,6 +7,7 @@ import {
   type AiProvider,
   type AiProviderSettings,
   type GarmentSuggestion,
+  type BodyEstimate,
   type PhotoCheck,
 } from '@vestirse/shared-types';
 import { AdminGuard } from '../../common/guards';
@@ -196,9 +197,23 @@ export class AiWorkerClient {
     return body?.suggestion ?? {};
   }
 
-  private async postImage<T>(path: string, image: Buffer): Promise<T | null> {
+  /** Medidas estimadas para la talla (OpenAI si está configurado). Sin análisis devuelve `checked: false`. */
+  async estimateBody(image: Buffer, heightCm: number): Promise<BodyEstimate> {
+    type Raw = { checked?: boolean; usable?: boolean; reason?: BodyEstimate['reason']; confidence?: BodyEstimate['confidence'] } & Record<string, unknown>;
+    const body = await this.postImage<Raw>('/v1/body/estimate', image, { heightCm: String(heightCm) });
+    if (!body?.checked) return { checked: false, usable: false };
+    if (!body.usable) return { checked: true, usable: false, reason: body.reason ?? null };
+    const measurements: NonNullable<BodyEstimate['measurements']> = {};
+    for (const key of ['chestCm', 'waistCm', 'hipCm', 'shoulderCm'] as const) {
+      if (typeof body[key] === 'number') measurements[key] = body[key] as number;
+    }
+    return { checked: true, usable: true, reason: null, measurements, confidence: body.confidence ?? 'low' };
+  }
+
+  private async postImage<T>(path: string, image: Buffer, fields: Record<string, string> = {}): Promise<T | null> {
     const form = new FormData();
     form.append('image', new Blob([new Uint8Array(image)], { type: 'image/jpeg' }), 'image.jpg');
+    for (const [name, value] of Object.entries(fields)) form.append(name, value);
     try {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',

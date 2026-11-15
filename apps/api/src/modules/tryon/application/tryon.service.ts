@@ -1,10 +1,10 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import { randomUUID } from 'node:crypto';
-import sharp from 'sharp';
 import { PHOTO_TTL_HOURS, type TryOnMode } from '@vestirse/shared-types';
+import { cleanPhoto, type UploadedPhoto } from '../../../common/photo';
 import type { Requester } from '../../../common/requester';
 import { ObjectStorage } from '../../../common/storage';
 import { AiWorkerClient } from '../../ai-settings/ai-settings.module';
@@ -33,8 +33,7 @@ export function generationJobOptions(sessionId: string, requestedAt: Date) {
   };
 }
 
-const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'image/webp'];
-export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+export { MAX_PHOTO_BYTES } from '../../../common/photo';
 
 @Injectable()
 export class TryOnService {
@@ -80,22 +79,9 @@ export class TryOnService {
    * Sube la foto (Track B). Se re-codifica en el servidor: se aplica la orientación
    * y se descartan TODOS los metadatos (EXIF/GPS), y se limita la resolución.
    */
-  async uploadPhoto(id: string, file: { buffer: Buffer; mimetype: string; size: number } | undefined, requester: Requester) {
-    if (!file) throw new BadRequestException('falta la imagen');
-    if (!ACCEPTED_MIME.includes(file.mimetype)) throw new UnprocessableEntityException('formato no admitido');
-    if (file.size > MAX_PHOTO_BYTES) throw new UnprocessableEntityException('imagen demasiado grande');
+  async uploadPhoto(id: string, file: UploadedPhoto | undefined, requester: Requester) {
+    const clean = await cleanPhoto(file);
     const session = await this.owned(id, requester);
-
-    let clean: Buffer;
-    try {
-      clean = await sharp(file.buffer, { limitInputPixels: 40_000_000 })
-        .rotate()
-        .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 88 })
-        .toBuffer();
-    } catch {
-      throw new UnprocessableEntityException('la imagen no se pudo leer');
-    }
 
     this.domain(() => session.assertPhotoChangeable());
     const stale = session.purgePhoto();
