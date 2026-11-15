@@ -149,7 +149,7 @@ export class GarmentMeasurementsStrategy implements FitStrategy {
   private readonly analyzer = new FitAnalyzer();
   private static readonly VERDICT_SCORE = { good: 1, large: 0.55, 'too-small': 0.1, 'too-large': 0.1 } as const;
 
-  evaluate({ chart, category, body, stretch, fitIntent }: FitContext): StrategyResult | null {
+  evaluate({ chart, category, body, measurements, stretch, fitIntent }: FitContext): StrategyResult | null {
     if (!body || body.chestCm === undefined) return null;
     const analyses = this.analyzer.analyzeAll({ body, category, sizeChart: [...chart.all], stretch, fitIntent });
     if (analyses.length === 0 || analyses.every((a) => a.zones.length === 0)) return null;
@@ -160,11 +160,15 @@ export class GarmentMeasurementsStrategy implements FitStrategy {
       const lengthOk = !a.length || a.length.label === 'as-designed' ? 0.05 : 0;
       scores[a.size] = Math.min(1, GarmentMeasurementsStrategy.VERDICT_SCORE[a.verdict] * 0.85 + asDesigned * 0.1 + lengthOk);
     }
+    // Contornos estimados por IA a partir de una foto: valen como estimación, no como cinta.
+    const fromPhoto = !!measurements.estimatedFromPose;
+    const estimated = body.estimated || fromPhoto;
+    const source = fromPhoto ? 'fit.basis.estimatedFromPhoto' : body.estimated ? 'fit.basis.estimatedFromWeight' : 'fit.basis.tapeMeasured';
     return {
       scores,
-      weight: body.estimated ? 2.5 : 3.5,
-      evidence: body.estimated ? 'estimated' : 'measured',
-      basis: [body.estimated ? 'fit.basis.estimatedFromWeight' : 'fit.basis.tapeMeasured', 'fit.basis.garmentMeasurements'],
+      weight: estimated ? 2.5 : 3.5,
+      evidence: estimated ? 'estimated' : 'measured',
+      basis: [source, 'fit.basis.garmentMeasurements'],
     };
   }
 }

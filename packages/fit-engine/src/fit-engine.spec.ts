@@ -37,6 +37,18 @@ describe('FitEngine', () => {
     expect(rec.basis).not.toContain('fit.basis.chestProvided');
   });
 
+  it('medidas de IA contra las medidas reales de la prenda: no cuentan como cinta métrica', () => {
+    const withGarment: SizeChartEntry[] = detailedTop.map((e, i) => ({ ...e, garment: { chestCm: 98 + i * 7, lengthCm: 68 + i * 2 } }));
+    const rec = engine.recommend({
+      measurements: { heightCm: 175, chestCm: 96, waistCm: 80, estimatedFromPose: true },
+      sizeChart: withGarment,
+      category: 'top',
+    });
+    expect(rec.basis).toContain('fit.basis.estimatedFromPhoto');
+    expect(rec.basis).not.toContain('fit.basis.tapeMeasured');
+    expect(rec.confidence).not.toBe('high');
+  });
+
   it('confianza alta con medidas y tabla detallada', () => {
     const rec = engine.recommend({
       measurements: { heightCm: 175, chestCm: 96, waistCm: 80 },
