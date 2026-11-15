@@ -21,10 +21,16 @@ class Settings(BaseSettings):
     # Groq: visión para el control de calidad de la foto y el etiquetado de prendas.
     groq_api_key: str = ""
     groq_vision_model: str = "qwen/qwen3.8-27b"
-    # "groq" (por defecto, gratuito) o "claude" (de pago; si falla o no tiene saldo, cae a Groq).
+    # "groq" (por defecto, gratuito), "claude" u "openai" (de pago; si fallan o no tienen saldo, caen a Groq).
     vision_provider: str = "groq"
     anthropic_api_key: str = ""
     claude_vision_model: str = "claude-haiku-5-5"
+    # OpenAI (VISION_PROVIDER=openai, cae a Groq): además estima medidas para la talla.
+    openai_api_key: str = ""
+    openai_vision_model: str = "gpt-4.1-mini"
+    # Tope de gasto acumulado (USD) y archivo donde se lleva la cuenta entre reinicios.
+    openai_budget_usd: float = 0.20
+    openai_spend_file: str = ".openai-spend.json"
     # Adaptadores heredados: se pueden configurar por entorno además de por cabecera.
     fal_key: str = ""
     fal_model: str = "fal-ai/cat-vton"

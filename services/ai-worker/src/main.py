@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from .config import Settings
 from .contract import CONTRACT_VERSION, Manifest, WorkerError, worker_error_handler
 from .providers import Credentials, GarmentInput, ProviderRegistry, TransferRequest, TryOnProvider, default_registry
-from .vision import ClaudeVision, FallbackVision, GroqVision, VisionClient, VisionUnavailable
+from .vision import ClaudeVision, FallbackVision, GroqVision, OpenAIVision, SpendMeter, VisionClient, VisionUnavailable
 
 app = FastAPI(title="Vestirse AI worker", version="1.0.0")
 app.add_exception_handler(WorkerError, worker_error_handler)
@@ -37,11 +37,24 @@ def get_registry() -> ProviderRegistry:
 
 
 @lru_cache
-def _vision(provider: str, groq_key: str, groq_model: str, claude_key: str, claude_model: str) -> VisionClient:
-    # Una instancia por configuración: su caché y su límite de llamadas viven entre peticiones.
+def _vision(
+    provider: str,
+    groq_key: str,
+    groq_model: str,
+    claude_key: str,
+    claude_model: str,
+    openai_key: str = "",
+    openai_model: str = "",
+    openai_budget: float = 0.0,
+    openai_spend_file: str = "",
+) -> VisionClient:
+    # Una instancia por configuración: su caché, su límite de llamadas y su gasto viven entre peticiones.
     groq = GroqVision(groq_key, groq_model)
     if provider == "claude":
         return FallbackVision([ClaudeVision(claude_key, claude_model), groq])
+    if provider == "openai":
+        meter = SpendMeter(openai_spend_file, openai_budget)
+        return FallbackVision([OpenAIVision(openai_key, openai_model, meter), groq])
     return groq
 
 
@@ -52,6 +65,10 @@ def get_vision(settings: Annotated[Settings, Depends(get_settings)]) -> VisionCl
         settings.groq_vision_model,
         settings.anthropic_api_key,
         settings.claude_vision_model,
+        settings.openai_api_key,
+        settings.openai_vision_model,
+        settings.openai_budget_usd,
+        settings.openai_spend_file,
     )
 
 
@@ -177,3 +194,18 @@ async def describe_garment(
         return {"checked": True, "suggestion": await vision.describe_garment(data)}
     except VisionUnavailable:
         return {"checked": False, "suggestion": {}}
+
+
+@app.post("/v1/body/estimate", dependencies=[Depends(require_token)])
+async def estimate_body(
+    image: Annotated[UploadFile, File()],
+    height_cm: Annotated[float, Form(alias="heightCm")],
+    vision: Annotated[VisionClient, Depends(get_vision)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
+    """Medidas estimadas para la talla. `checked: false` = sin análisis; la talla sigue saliendo de la altura."""
+    data = await _read_limited(image, settings.max_upload_bytes, "foto")
+    try:
+        return {"checked": True, **await vision.estimate_body(data, height_cm)}
+    except VisionUnavailable:
+        return {"checked": False, "usable": False, "reason": None}

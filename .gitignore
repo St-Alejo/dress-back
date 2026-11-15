@@ -16,3 +16,6 @@ playwright-report/
 # Material local que no se publica
 docs/imagenes/
 seed/photos/_raw/
+
+# Gasto acumulado de la API de OpenAI (worker local)
+.openai-spend.json
