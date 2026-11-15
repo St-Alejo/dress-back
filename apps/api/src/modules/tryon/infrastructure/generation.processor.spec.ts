@@ -4,7 +4,7 @@ import { MemorySessions, MemoryStorage } from '../../../testing/memory';
 import type { AiSettingsService } from '../../ai-settings/ai-settings.module';
 import type { CatalogRepository } from '../../catalog/application/catalog.repository';
 import type { MetricsService } from '../../metrics/metrics.module';
-import { GarmentTransferPort, TransferUnavailableError, type TransferRequest, type TransferResult } from '../application/garment-transfer.port';
+import { GarmentTransferPort, TransferUnavailableError, type FinishRequest, type TransferRequest, type TransferResult } from '../application/garment-transfer.port';
 import type { GenerationJob } from '../application/tryon.service';
 import { TryOnSession } from '../domain/tryon-session.entity';
 import { GenerationProcessor } from './generation.processor';
@@ -244,5 +244,64 @@ describe('GenerationProcessor con un conjunto (probador)', () => {
     await env.processor.process(job());
     // Una sola prenda: va tal cual al motor, que responde si la sabe poner.
     expect(env.transfer.calls).toHaveLength(1);
+  });
+  describe('acabado del conjunto', () => {
+    const CHART = [{ size: 'S' }, { size: 'M' }, { size: 'L' }, { size: 'XL' }];
+
+    async function outfitSession(env: ReturnType<typeof setup>, items: { garmentId: string; size: string }[], userId?: string) {
+      const s = TryOnSession.start({
+        id: 's1', garmentId: items[0]!.garmentId, mode: 'photorealistic', outfit: items,
+        requester: { sid: 'sid', userId }, now: new Date(),
+      });
+      s.attachPhoto(new Date(), 24);
+      s.requestGeneration();
+      await env.storage.put(s.photoKey!, Buffer.from('persona'));
+      await env.sessions.create(s);
+    }
+
+    function withFinisher(env: ReturnType<typeof setup>, finish: (req: FinishRequest) => Promise<TransferResult | null>) {
+      const calls: FinishRequest[] = [];
+      const p = env.processor as unknown as Record<string, unknown>;
+      p.finisher = { finish: async (req: FinishRequest) => (calls.push(req), finish(req)) };
+      p.sizes = { forUser: async (userId?: string) => new Map(userId ? [['shirt', 'M'], ['jeans', 'M']] : []) };
+      const catalog = p.catalog as Record<string, unknown>;
+      const find = catalog.findGarment as (id: string) => Promise<GarmentItem>;
+      catalog.findGarment = async (id: string) => ({ ...(await find(id)), sizeChart: CHART });
+      return calls;
+    }
+
+    it('manda todas las prendas (zapatos incluidos) con la diferencia de talla y guarda el acabado', async () => {
+      const env = outfitSetup();
+      const calls = withFinisher(env, async () => ({ image: Buffer.from('acabado'), engine: 'openai:mini', durationMs: 40 }));
+      await outfitSession(env, [{ garmentId: 'shirt', size: 'L' }, { garmentId: 'jeans', size: 'M' }, { garmentId: 'shoes', size: '42' }], 'u1');
+      await env.processor.process(job());
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.person.toString()).toBe('paso-2');
+      expect(calls[0]!.pieces.map((p) => [p.name, p.delta])).toEqual([['Jean', 0], ['Camisa', 1], ['Zapatillas', 0]]);
+      const done = (await env.sessions.findById('s1'))!;
+      expect(env.storage.objects.get(done.resultKey!)?.toString()).toBe('acabado');
+      expect(env.record).toHaveBeenCalledWith('generation-completed', expect.objectContaining({ engine: 'mock+openai:mini', durationMs: 60 }));
+    });
+
+    it('sin perfil no exagera la talla, y si el acabado falla se queda el resultado del motor', async () => {
+      const env = outfitSetup();
+      const calls = withFinisher(env, async () => null);
+      await outfitSession(env, [{ garmentId: 'shirt', size: 'XL' }, { garmentId: 'shoes', size: '42' }]);
+      await env.processor.process(job());
+
+      expect(calls[0]!.pieces.map((p) => p.delta)).toEqual([0, 0]);
+      const done = (await env.sessions.findById('s1'))!;
+      expect(done.status).toBe('done');
+      expect(env.storage.objects.get(done.resultKey!)?.toString()).toBe('paso-1');
+    });
+
+    it('una prueba de una sola prenda (sin conjunto) no pasa por el acabado', async () => {
+      const env = setup();
+      const calls = withFinisher(env, async () => ({ image: Buffer.from('x'), engine: 'f', durationMs: 1 }));
+      await queuedSession(env);
+      await env.processor.process(job());
+      expect(calls).toHaveLength(0);
+    });
   });
 });

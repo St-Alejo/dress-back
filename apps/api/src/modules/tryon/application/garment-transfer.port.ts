@@ -47,3 +47,27 @@ export interface TransferRequest {
 export abstract class GarmentTransferPort {
   abstract generate(req: TransferRequest): Promise<TransferResult>;
 }
+
+/** Prenda para el acabado: foto de catálogo y tallas de diferencia con la recomendada (+1 = una mayor). */
+export interface FinishPiece {
+  image: Buffer;
+  mime: string;
+  category: GarmentCategory;
+  name: string;
+  delta: number;
+}
+
+export interface FinishRequest {
+  requestId: string;
+  /** Resultado del probador (la persona ya vestida). */
+  person: Buffer;
+  pieces: FinishPiece[];
+}
+
+/**
+ * Acabado con IA de imagen (opcional y de pago, con tope en el worker): tela realista, talla elegida y
+ * zapatos. Devuelve null si no está disponible; la prueba se queda con el resultado del probador.
+ */
+export abstract class OutfitFinisherPort {
+  abstract finish(req: FinishRequest): Promise<TransferResult | null>;
+}

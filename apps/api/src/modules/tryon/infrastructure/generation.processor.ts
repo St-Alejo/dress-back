@@ -1,13 +1,14 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Logger, Optional } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import { AI_DRESSING_ORDER, AI_WEARABLE } from '@vestirse/shared-types';
+import { AI_DRESSING_ORDER, AI_WEARABLE, type GarmentItem } from '@vestirse/shared-types';
 import { ObjectStorage } from '../../../common/storage';
 import { AiSettingsService } from '../../ai-settings/ai-settings.module';
 import { CatalogRepository } from '../../catalog/application/catalog.repository';
 import { MetricsService } from '../../metrics/metrics.module';
 import { describeBody, describeFit } from '../application/fit-brief';
-import { GarmentTransferPort, TransferUnavailableError, type TransferGarment, type TransferResult } from '../application/garment-transfer.port';
+import { GarmentTransferPort, OutfitFinisherPort, TransferUnavailableError, type TransferGarment, type TransferResult } from '../application/garment-transfer.port';
+import { RecommendedSizes, sizeDelta } from '../application/outfit-finish';
 import { TryOnSessionRepository } from '../application/tryon-session.repository';
 import { GENERATION_QUEUE, type GenerationJob } from '../application/tryon.service';
 import type { TryOnSession } from '../domain/tryon-session.entity';
@@ -28,7 +29,11 @@ import { TryOnGateway } from './tryon.gateway';
  *
  * Conjuntos (probador): los motores visten una prenda por llamada, así que se aplican de
  * dentro hacia fuera (pantalón, camisa, chaqueta) y cada resultado es la persona del paso
- * siguiente. Calzado y accesorios no los sabe poner la IA: se quedan en la vista instantánea.
+ * siguiente. Calzado y accesorios no los sabe poner ese motor.
+ *
+ * Acabado (solo conjuntos del probador, si hay IA de imagen configurada): una edición final da a la
+ * ropa textura de foto real, muestra la talla elegida frente a la recomendada para el perfil (holgada o
+ * ajustada) y pone los zapatos del conjunto. Si falla, se guarda el resultado del motor tal cual.
  */
 @Processor(GENERATION_QUEUE, { concurrency: 2 })
 export class GenerationProcessor extends WorkerHost {
@@ -42,6 +47,8 @@ export class GenerationProcessor extends WorkerHost {
     private readonly aiSettings: AiSettingsService,
     private readonly gateway: TryOnGateway,
     private readonly metrics: MetricsService,
+    @Optional() private readonly finisher?: OutfitFinisherPort,
+    @Optional() private readonly sizes?: RecommendedSizes,
   ) {
     super();
   }
@@ -62,8 +69,9 @@ export class GenerationProcessor extends WorkerHost {
     this.gateway.emit({ sessionId, status: 'processing', progress: 0.1 });
 
     try {
-      const [person, garments] = await Promise.all([this.storage.getBuffer(session.photoKey), this.garmentsFor(session)]);
-      if (!person || !garments) return this.end(session, 'failed', 'missing-input');
+      const [person, loaded] = await Promise.all([this.storage.getBuffer(session.photoKey), this.loadGarments(session)]);
+      if (!person || !loaded) return this.end(session, 'failed', 'missing-input');
+      const garments = this.wearable(loaded);
       if (garments.length === 0) return this.end(session, 'fallback', 'unsupported');
 
       // Con resultado propio, pedir otra generación es querer una imagen nueva: no se reutiliza.
@@ -88,6 +96,7 @@ export class GenerationProcessor extends WorkerHost {
           });
           result = { ...result, durationMs: previous.durationMs + result.durationMs };
         }
+        result = await this.finishOutfit(session, loaded, result, attempt);
       }
 
       // Re-leer: la persona pudo borrar la foto mientras se generaba; en ese caso se descarta el resultado.
@@ -113,8 +122,7 @@ export class GenerationProcessor extends WorkerHost {
     }
   }
 
-  /** Prendas que la IA puede vestir, en orden de dentro hacia fuera; null si falta alguna imagen. */
-  private async garmentsFor(session: TryOnSession): Promise<TransferGarment[] | null> {
+  private async loadGarments(session: TryOnSession): Promise<LoadedGarment[] | null> {
     const loaded = await Promise.all(
       session.garmentIds.map(async (id) => {
         const [garment, photo] = await Promise.all([this.catalog.findGarment(id), this.catalog.garmentPhoto(id)]);
@@ -123,7 +131,11 @@ export class GenerationProcessor extends WorkerHost {
       }),
     );
     const found = loaded.filter((g) => g !== null);
-    if (found.length < loaded.length) return null;
+    return found.length < loaded.length ? null : found;
+  }
+
+  /** Prendas que el motor puede vestir, en orden de dentro hacia fuera. */
+  private wearable(found: LoadedGarment[]): TransferGarment[] {
     const single = found.length === 1;
     return found
       .filter((g) => single || AI_WEARABLE.includes(g.garment.category))
@@ -137,6 +149,26 @@ export class GenerationProcessor extends WorkerHost {
         fit: describeFit(null, garment.category, garment.knownLimitations),
         photoType: photo.photoType,
       }));
+  }
+
+  /** Acabado del conjunto (zapatos incluidos y talla elegida); sin acabado, el resultado del motor. */
+  private async finishOutfit(session: TryOnSession, loaded: LoadedGarment[], result: TransferResult, attempt: number): Promise<TransferResult> {
+    const outfit = session.snapshot.outfit;
+    if (!this.finisher || !outfit?.length) return result;
+    this.gateway.emit({ sessionId: session.id, status: 'processing', progress: 0.92 });
+    const recommended = (await this.sizes?.forUser(session.snapshot.userId, loaded.map((g) => g.garment))) ?? new Map<string, string>();
+    const pieces = [...loaded]
+      .sort((a, b) => AI_DRESSING_ORDER[a.garment.category] - AI_DRESSING_ORDER[b.garment.category])
+      .map(({ garment, image }) => ({
+        image,
+        mime: 'image/jpeg',
+        category: garment.category,
+        name: garment.name,
+        delta: sizeDelta(garment.sizeChart ?? [], outfit.find((o) => o.garmentId === garment.id)?.size, recommended.get(garment.id)),
+      }));
+    const finished = await this.finisher.finish({ requestId: `${session.id}-${attempt}-finish`, person: result.image, pieces });
+    if (!finished) return result;
+    return { image: finished.image, engine: `${result.engine}+${finished.engine}`, durationMs: result.durationMs + finished.durationMs };
   }
 
   private async previousResult(session: TryOnSession, person: Buffer): Promise<Buffer | null> {
@@ -161,4 +193,10 @@ export class GenerationProcessor extends WorkerHost {
     await this.metrics.record('generation-failed', { sessionId: current.id, reason, status });
     this.gateway.emit({ sessionId: current.id, status, progress: 1, fallbackReason: reason });
   }
+}
+
+interface LoadedGarment {
+  garment: GarmentItem;
+  photo: { key: string; photoType: TransferGarment['photoType'] };
+  image: Buffer;
 }
