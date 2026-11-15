@@ -1,0 +1,343 @@
+[
+  {
+    "id": "el-oficina",
+    "wearer": "Él",
+    "body": "b05",
+    "title": "Oficina casual",
+    "note": "Todo en su talla recomendada: así le queda de verdad.",
+    "items": [
+      {
+        "name": "Camisa Oxford celeste",
+        "size": "L",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Jean pitillo oscuro",
+        "size": "42",
+        "recommendedSize": "42"
+      },
+      {
+        "name": "Tenis blancos de cuero",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "el-oxford-grande",
+    "wearer": "Él",
+    "body": "b05",
+    "title": "La misma camisa, una talla más",
+    "note": "La prenda de arriba (Camisa Oxford celeste) en talla XL cuando su talla es L: le queda grande y holgada.",
+    "items": [
+      {
+        "name": "Camisa Oxford celeste",
+        "size": "XL",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Jean pitillo oscuro",
+        "size": "42",
+        "recommendedSize": "42"
+      },
+      {
+        "name": "Tenis blancos de cuero",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "el-camiseta-justa",
+    "wearer": "Él",
+    "body": "b05",
+    "title": "Camiseta una talla menos",
+    "note": "La prenda de arriba (Camiseta básica blanca) en talla M cuando su talla es L: le queda justa y ajustada.",
+    "items": [
+      {
+        "name": "Camiseta básica blanca",
+        "size": "M",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Jogger negro",
+        "size": "L",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Tenis blancos de cuero",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "el-fin-de-semana",
+    "wearer": "Él",
+    "body": "b05",
+    "title": "Fin de semana",
+    "note": "Todo en su talla recomendada: así le queda de verdad.",
+    "items": [
+      {
+        "name": "Buzo con capucha blanco",
+        "size": "L",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Jogger negro",
+        "size": "L",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Tenis blancos de cuero",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "el-cena",
+    "wearer": "Él",
+    "body": "b05",
+    "title": "Cena con blazer",
+    "note": "Todo en su talla recomendada: así le queda de verdad.",
+    "items": [
+      {
+        "name": "Camiseta básica blanca",
+        "size": "L",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Pantalón de pana oliva",
+        "size": "L",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Blazer beige",
+        "size": "L",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Botines negros con hebilla",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "el-mezclilla",
+    "wearer": "Él",
+    "body": "b05",
+    "title": "Capas de mezclilla",
+    "note": "Todo en su talla recomendada: así le queda de verdad.",
+    "items": [
+      {
+        "name": "Camiseta de rayas pastel",
+        "size": "L",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Jean ancho claro",
+        "size": "42",
+        "recommendedSize": "42"
+      },
+      {
+        "name": "Chaqueta de mezclilla",
+        "size": "L",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Tenis blancos de cuero",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "el-sueter-oversize",
+    "wearer": "Él",
+    "body": "b05",
+    "title": "Suéter oversize (dos tallas más)",
+    "note": "La prenda de arriba (Suéter verde de cuello alto) en talla XXL cuando su talla es L: muy holgada, estilo oversize.",
+    "items": [
+      {
+        "name": "Suéter verde de cuello alto",
+        "size": "XXL",
+        "recommendedSize": "L"
+      },
+      {
+        "name": "Jean pitillo oscuro",
+        "size": "42",
+        "recommendedSize": "42"
+      },
+      {
+        "name": "Botines negros con hebilla",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "ella-vestido-rojo",
+    "wearer": "Ella",
+    "body": "b02",
+    "title": "Vestido rojo de fiesta",
+    "note": "Todo en su talla recomendada: así le queda de verdad.",
+    "items": [
+      {
+        "name": "Vestido rojo plisado",
+        "size": "S",
+        "recommendedSize": "S"
+      },
+      {
+        "name": "Botines negros con hebilla",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "ella-flores",
+    "wearer": "Ella",
+    "body": "b02",
+    "title": "Flores y jean mom",
+    "note": "Todo en su talla recomendada: así le queda de verdad.",
+    "items": [
+      {
+        "name": "Camisa de flores rojas",
+        "size": "S",
+        "recommendedSize": "S"
+      },
+      {
+        "name": "Jean mom con lazo",
+        "size": "42",
+        "recommendedSize": "42"
+      },
+      {
+        "name": "Tenis blancos de cuero",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "ella-menta",
+    "wearer": "Ella",
+    "body": "b02",
+    "title": "Blazer menta y amarillo",
+    "note": "Todo en su talla recomendada: así le queda de verdad.",
+    "items": [
+      {
+        "name": "Camiseta básica blanca",
+        "size": "XS",
+        "recommendedSize": "XS"
+      },
+      {
+        "name": "Pantalón pitillo amarillo",
+        "size": "S",
+        "recommendedSize": "S"
+      },
+      {
+        "name": "Blazer verde menta",
+        "size": "S",
+        "recommendedSize": "S"
+      },
+      {
+        "name": "Botines camel de tacón",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "ella-cardigan-grande",
+    "wearer": "Ella",
+    "body": "b02",
+    "title": "Cárdigan una talla más",
+    "note": "La prenda de arriba (Cárdigan rojo de punto) en talla S cuando su talla es XS: le queda grande y holgada.",
+    "items": [
+      {
+        "name": "Cárdigan rojo de punto",
+        "size": "S",
+        "recommendedSize": "XS"
+      },
+      {
+        "name": "Jean mom con lazo",
+        "size": "42",
+        "recommendedSize": "42"
+      },
+      {
+        "name": "Tenis blancos de cuero",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "ella-floral-justo",
+    "wearer": "Ella",
+    "body": "b02",
+    "title": "Vestido floral una talla menos",
+    "note": "El vestido (Vestido floral de manga ancha) en talla XS cuando su talla es S: le queda justa y ajustada.",
+    "items": [
+      {
+        "name": "Vestido floral de manga ancha",
+        "size": "XS",
+        "recommendedSize": "S"
+      },
+      {
+        "name": "Botines camel de tacón",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "ella-leopardo",
+    "wearer": "Ella",
+    "body": "b02",
+    "title": "Leopardo y lunares",
+    "note": "Todo en su talla recomendada: así le queda de verdad.",
+    "items": [
+      {
+        "name": "Blusa de leopardo",
+        "size": "S",
+        "recommendedSize": "S"
+      },
+      {
+        "name": "Falda midi roja de lunares",
+        "size": "S",
+        "recommendedSize": "S"
+      },
+      {
+        "name": "Botines camel de tacón",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  },
+  {
+    "id": "ella-pana-grande",
+    "wearer": "Ella",
+    "body": "b02",
+    "title": "Pantalón de pana una talla más",
+    "note": "El pantalón (Pantalón de pana oliva) en talla M cuando su talla es S: le queda grande y holgada.",
+    "items": [
+      {
+        "name": "Camiseta de rayas pastel",
+        "size": "S",
+        "recommendedSize": "S"
+      },
+      {
+        "name": "Pantalón de pana oliva",
+        "size": "M",
+        "recommendedSize": "S"
+      },
+      {
+        "name": "Tenis blancos de cuero",
+        "size": "40",
+        "recommendedSize": "40"
+      }
+    ]
+  }
+]
