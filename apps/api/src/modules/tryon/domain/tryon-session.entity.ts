@@ -1,4 +1,4 @@
-import type { FitRecommendation, GenerationStatus, TryOnMode, TryOnSession as TryOnSessionDto } from '@vestirse/shared-types';
+import type { FitRecommendation, GenerationStatus, OutfitItem, TryOnMode, TryOnSession as TryOnSessionDto } from '@vestirse/shared-types';
 import type { Requester } from '../../../common/requester';
 
 export interface TryOnSessionProps {
@@ -14,6 +14,8 @@ export interface TryOnSessionProps {
   resultSaved: boolean;
   generationStatus: GenerationStatus;
   fitRecommendation?: FitRecommendation;
+  /** Conjunto a probar a la vez (incluye `garmentId`); sin él, solo esa prenda. */
+  outfit?: OutfitItem[];
   /** Por qué terminó en `failed` o `fallback` (código del contrato o motivo interno). */
   failureReason?: string;
   /** Última transición de estado: permite detectar generaciones atascadas. */
@@ -33,7 +35,18 @@ const IN_FLIGHT: GenerationStatus[] = ['queued', 'processing'];
 export class TryOnSession {
   private constructor(private props: TryOnSessionProps) {}
 
-  static start(args: { id: string; garmentId: string; mode: TryOnMode; bodyModelId?: string; requester: Requester; now: Date }) {
+  static start(args: {
+    id: string;
+    garmentId: string;
+    mode: TryOnMode;
+    bodyModelId?: string;
+    outfit?: OutfitItem[];
+    requester: Requester;
+    now: Date;
+  }) {
+    if (args.outfit?.length && !args.outfit.some((o) => o.garmentId === args.garmentId)) {
+      throw new DomainError('la prenda principal debe estar en el conjunto');
+    }
     return new TryOnSession({
       id: args.id,
       ownerSid: args.requester.sid,
@@ -41,6 +54,7 @@ export class TryOnSession {
       garmentId: args.garmentId,
       mode: args.mode,
       bodyModelId: args.bodyModelId,
+      outfit: args.outfit?.length ? args.outfit : undefined,
       resultSaved: false,
       generationStatus: 'idle',
       statusChangedAt: args.now,
@@ -54,6 +68,8 @@ export class TryOnSession {
 
   get id() { return this.props.id; }
   get garmentId() { return this.props.garmentId; }
+  /** Prendas a probar: el conjunto o, si no hay, la prenda de la sesión. */
+  get garmentIds() { return this.props.outfit?.map((o) => o.garmentId) ?? [this.props.garmentId]; }
   get mode() { return this.props.mode; }
   get photoKey() { return this.props.photoKey; }
   get resultKey() { return this.props.resultKey; }
@@ -177,6 +193,7 @@ export class TryOnSession {
       generationStatus: p.generationStatus,
       failureReason: p.failureReason,
       fitRecommendation: p.fitRecommendation,
+      outfit: p.outfit,
       createdAt: p.createdAt.toISOString(),
     };
   }

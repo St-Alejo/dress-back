@@ -111,3 +111,18 @@ describe('TryOnSession', () => {
     expect(s.isStuck(new Date(now.getTime() + 180_000), 120_000)).toBe(false);
   });
 });
+
+describe('TryOnSession con conjunto', () => {
+  it('la prenda principal tiene que estar en el conjunto', () => {
+    expect(() =>
+      TryOnSession.start({ id: 's', garmentId: 'a', mode: 'photorealistic', outfit: [{ garmentId: 'b', size: 'M' }], requester: { sid: 'x' }, now: new Date() }),
+    ).toThrow();
+  });
+
+  it('expone las prendas del conjunto y las devuelve en el DTO', () => {
+    const outfit = [{ garmentId: 'a', size: 'M' }, { garmentId: 'b', size: '40' }];
+    const s = TryOnSession.start({ id: 's', garmentId: 'a', mode: 'photorealistic', outfit, requester: { sid: 'x' }, now: new Date() });
+    expect(s.garmentIds).toEqual(['a', 'b']);
+    expect(s.toDto().outfit).toEqual(outfit);
+  });
+});

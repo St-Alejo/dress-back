@@ -183,3 +183,66 @@ describe('GenerationProcessor', () => {
     expect([...env.storage.objects.keys()].some((k) => k.endsWith('result.png'))).toBe(false);
   });
 });
+
+describe('GenerationProcessor con un conjunto (probador)', () => {
+  const OUTFIT: Record<string, GarmentItem> = {
+    shirt: { id: 'shirt', name: 'Camisa', category: 'top', color: 'white' } as GarmentItem,
+    jeans: { id: 'jeans', name: 'Jean', category: 'bottom', color: 'blue' } as GarmentItem,
+    jacket: { id: 'jacket', name: 'Chaqueta', category: 'outerwear', color: 'black' } as GarmentItem,
+    shoes: { id: 'shoes', name: 'Zapatillas', category: 'footwear', color: 'white' } as GarmentItem,
+  };
+
+  function outfitSetup() {
+    const env = setup();
+    const catalog = env.processor['catalog'] as unknown as Record<string, unknown>;
+    catalog.findGarment = async (id: string) => OUTFIT[id];
+    catalog.garmentPhoto = async (id: string) => ({ key: `catalog/garments/${id}/photo.jpg`, photoType: 'flat-lay' });
+    for (const id of Object.keys(OUTFIT)) env.storage.objects.set(`catalog/garments/${id}/photo.jpg`, Buffer.from(id));
+    let n = 0;
+    env.transfer.next = async () => ({ image: Buffer.from(`paso-${++n}`), engine: 'mock', durationMs: 10 });
+    return env;
+  }
+
+  it('viste de dentro hacia fuera, una prenda por paso sobre el resultado anterior, sin calzado', async () => {
+    const env = outfitSetup();
+    const ids = ['jacket', 'shoes', 'shirt', 'jeans'];
+    const s = TryOnSession.start({
+      id: 's1',
+      garmentId: 'shirt',
+      mode: 'photorealistic',
+      outfit: ids.map((garmentId) => ({ garmentId, size: 'M' })),
+      requester: { sid: 'sid' },
+      now: new Date(),
+    });
+    s.attachPhoto(new Date(), 24);
+    s.requestGeneration();
+    await env.storage.put(s.photoKey!, Buffer.from('persona'));
+    await env.sessions.create(s);
+
+    await env.processor.process(job());
+
+    expect(env.transfer.calls.map((c) => c.garments.map((g) => g.name))).toEqual([['Jean'], ['Camisa'], ['Chaqueta']]);
+    expect(env.transfer.calls.map((c) => c.person.toString())).toEqual(['persona', 'paso-1', 'paso-2']);
+    expect(new Set(env.transfer.calls.map((c) => c.requestId)).size).toBe(3);
+    const done = (await env.sessions.findById('s1'))!;
+    expect(done.status).toBe('done');
+    expect(env.storage.objects.get(done.resultKey!)?.toString()).toBe('paso-3');
+    expect(env.emit).toHaveBeenCalledWith(expect.objectContaining({ status: 'processing', progress: expect.any(Number) }));
+    expect(env.record).toHaveBeenCalledWith('generation-completed', expect.objectContaining({ durationMs: 30 }));
+  });
+
+  it('un conjunto solo de calzado no llama a la IA y ofrece la vista instantánea', async () => {
+    const env = outfitSetup();
+    const s = TryOnSession.start({
+      id: 's1', garmentId: 'shoes', mode: 'photorealistic', outfit: [{ garmentId: 'shoes', size: '42' }],
+      requester: { sid: 'sid' }, now: new Date(),
+    });
+    s.attachPhoto(new Date(), 24);
+    s.requestGeneration();
+    await env.storage.put(s.photoKey!, Buffer.from('persona'));
+    await env.sessions.create(s);
+    await env.processor.process(job());
+    // Una sola prenda: va tal cual al motor, que responde si la sabe poner.
+    expect(env.transfer.calls).toHaveLength(1);
+  });
+});

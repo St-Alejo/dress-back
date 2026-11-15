@@ -1,12 +1,13 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
+import { AI_DRESSING_ORDER, AI_WEARABLE } from '@vestirse/shared-types';
 import { ObjectStorage } from '../../../common/storage';
 import { AiSettingsService } from '../../ai-settings/ai-settings.module';
 import { CatalogRepository } from '../../catalog/application/catalog.repository';
 import { MetricsService } from '../../metrics/metrics.module';
 import { describeBody, describeFit } from '../application/fit-brief';
-import { GarmentTransferPort, TransferUnavailableError } from '../application/garment-transfer.port';
+import { GarmentTransferPort, TransferUnavailableError, type TransferGarment, type TransferResult } from '../application/garment-transfer.port';
 import { TryOnSessionRepository } from '../application/tryon-session.repository';
 import { GENERATION_QUEUE, type GenerationJob } from '../application/tryon.service';
 import type { TryOnSession } from '../domain/tryon-session.entity';
@@ -24,6 +25,10 @@ import { TryOnGateway } from './tryon.gateway';
  *
  * Los motores gratuitos tienen cuota diaria: si la misma persona ya probó esta prenda
  * con esta misma foto, se reutiliza ese resultado en vez de volver a generar.
+ *
+ * Conjuntos (probador): los motores visten una prenda por llamada, así que se aplican de
+ * dentro hacia fuera (pantalón, camisa, chaqueta) y cada resultado es la persona del paso
+ * siguiente. Calzado y accesorios no los sabe poner la IA: se quedan en la vista instantánea.
  */
 @Processor(GENERATION_QUEUE, { concurrency: 2 })
 export class GenerationProcessor extends WorkerHost {
@@ -57,33 +62,33 @@ export class GenerationProcessor extends WorkerHost {
     this.gateway.emit({ sessionId, status: 'processing', progress: 0.1 });
 
     try {
-      const garment = await this.catalog.findGarment(session.garmentId);
-      const photo = await this.catalog.garmentPhoto(session.garmentId);
-      const [person, garmentImage] = await Promise.all([
-        this.storage.getBuffer(session.photoKey),
-        photo ? this.storage.getBuffer(photo.key) : null,
-      ]);
-      if (!garment || !photo || !person || !garmentImage) return this.end(session, 'failed', 'missing-input');
+      const [person, garments] = await Promise.all([this.storage.getBuffer(session.photoKey), this.garmentsFor(session)]);
+      if (!person || !garments) return this.end(session, 'failed', 'missing-input');
+      if (garments.length === 0) return this.end(session, 'fallback', 'unsupported');
 
       // Con resultado propio, pedir otra generación es querer una imagen nueva: no se reutiliza.
-      const reused = session.resultKey ? null : await this.previousResult(session, person);
-      const result = reused ? { image: reused, engine: 'reused', durationMs: 0 } : await this.transfer.generate({
-        requestId: `${sessionId}-${attempt}`,
-        person,
-        garments: [
-          {
-            image: garmentImage,
-            mime: 'image/jpeg',
-            category: garment.category,
-            name: garment.name,
-            color: garment.color,
-            fit: describeFit(null, garment.category, garment.knownLimitations),
-            photoType: photo.photoType,
-          },
-        ],
-        bodyBrief: describeBody(),
-        credentials: await this.aiSettings.resolve(),
-      });
+      const reused = session.resultKey || garments.length > 1 ? null : await this.previousResult(session, person);
+      let result: TransferResult = { image: reused ?? person, engine: 'reused', durationMs: 0 };
+      if (!reused) {
+        const credentials = await this.aiSettings.resolve();
+        for (const [step, garment] of garments.entries()) {
+          if (step > 0) {
+            // Paso intermedio: refrescar el estado para que el reaper no lo tome por atascado.
+            session.markProcessing();
+            await this.sessions.save(session);
+            this.gateway.emit({ sessionId, status: 'processing', progress: 0.1 + (0.8 * step) / garments.length });
+          }
+          const previous: TransferResult = result;
+          result = await this.transfer.generate({
+            requestId: garments.length > 1 ? `${sessionId}-${attempt}-${step}` : `${sessionId}-${attempt}`,
+            person: previous.image,
+            garments: [garment],
+            bodyBrief: describeBody(),
+            credentials,
+          });
+          result = { ...result, durationMs: previous.durationMs + result.durationMs };
+        }
+      }
 
       // Re-leer: la persona pudo borrar la foto mientras se generaba; en ese caso se descarta el resultado.
       const current = await this.sessions.findById(sessionId);
@@ -106,6 +111,32 @@ export class GenerationProcessor extends WorkerHost {
       this.logger.error(`generación ${sessionId} falló: ${(err as Error).message}`);
       return this.end(session, 'failed', 'internal');
     }
+  }
+
+  /** Prendas que la IA puede vestir, en orden de dentro hacia fuera; null si falta alguna imagen. */
+  private async garmentsFor(session: TryOnSession): Promise<TransferGarment[] | null> {
+    const loaded = await Promise.all(
+      session.garmentIds.map(async (id) => {
+        const [garment, photo] = await Promise.all([this.catalog.findGarment(id), this.catalog.garmentPhoto(id)]);
+        const image = photo ? await this.storage.getBuffer(photo.key) : null;
+        return garment && photo && image ? { garment, photo, image } : null;
+      }),
+    );
+    const found = loaded.filter((g) => g !== null);
+    if (found.length < loaded.length) return null;
+    const single = found.length === 1;
+    return found
+      .filter((g) => single || AI_WEARABLE.includes(g.garment.category))
+      .sort((a, b) => AI_DRESSING_ORDER[a.garment.category] - AI_DRESSING_ORDER[b.garment.category])
+      .map(({ garment, photo, image }) => ({
+        image,
+        mime: 'image/jpeg',
+        category: garment.category,
+        name: garment.name,
+        color: garment.color,
+        fit: describeFit(null, garment.category, garment.knownLimitations),
+        photoType: photo.photoType,
+      }));
   }
 
   private async previousResult(session: TryOnSession, person: Buffer): Promise<Buffer | null> {

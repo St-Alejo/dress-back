@@ -1,9 +1,9 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import { randomUUID } from 'node:crypto';
-import { PHOTO_TTL_HOURS, type TryOnMode } from '@vestirse/shared-types';
+import { outfitConflict, PHOTO_TTL_HOURS, type OutfitItem, type TryOnMode } from '@vestirse/shared-types';
 import { cleanPhoto, type UploadedPhoto } from '../../../common/photo';
 import type { Requester } from '../../../common/requester';
 import { ObjectStorage } from '../../../common/storage';
@@ -51,9 +51,16 @@ export class TryOnService {
     this.ttlHours = Number(config.get('PHOTO_TTL_HOURS', PHOTO_TTL_HOURS));
   }
 
-  async start(args: { garmentId: string; mode: TryOnMode; bodyModelId?: string }, requester: Requester) {
-    if (!(await this.catalog.findGarment(args.garmentId))) throw new NotFoundException('prenda no encontrada');
-    const session = TryOnSession.start({ id: randomUUID(), ...args, requester, now: new Date() });
+  async start(args: { garmentId: string; mode: TryOnMode; bodyModelId?: string; outfit?: OutfitItem[] }, requester: Requester) {
+    const ids = [...new Set([args.garmentId, ...(args.outfit ?? []).map((o) => o.garmentId)])];
+    const garments = await Promise.all(ids.map((id) => this.catalog.findGarment(id)));
+    if (garments.some((g) => !g)) throw new NotFoundException('prenda no encontrada');
+    // Una prenda por zona: dos camisas, o vestido y pantalón, no se pueden llevar a la vez.
+    if (args.outfit?.length) {
+      const conflict = outfitConflict(args.outfit.map((o) => garments[ids.indexOf(o.garmentId)]!.category));
+      if (conflict) throw new UnprocessableEntityException(`dos prendas para la misma zona: ${conflict}`);
+    }
+    const session = this.domain(() => TryOnSession.start({ id: randomUUID(), ...args, requester, now: new Date() }));
     // El uso de modalidad lo reporta el cliente al elegirla; crear la sesión no cuenta dos veces.
     await this.sessions.create(session);
     return session.toDto();
@@ -142,9 +149,9 @@ export class TryOnService {
     return session;
   }
 
-  private domain(fn: () => void) {
+  private domain<T>(fn: () => T): T {
     try {
-      fn();
+      return fn();
     } catch (err) {
       if (err instanceof DomainError) throw new ConflictException(err.message);
       throw err;

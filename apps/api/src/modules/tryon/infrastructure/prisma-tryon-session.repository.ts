@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { FitRecommendation } from '@vestirse/shared-types';
+import type { FitRecommendation, OutfitItem } from '@vestirse/shared-types';
 import { fromDbMode, toDbMode } from '../../../common/mappers';
 import { PrismaService } from '../../../common/prisma.service';
 import type { Requester } from '../../../common/requester';
@@ -23,6 +23,7 @@ const toEntity = (r: Row) =>
     failureReason: r.failureReason ?? undefined,
     statusChangedAt: r.statusChangedAt,
     fitRecommendation: (r.fitRecommendation as unknown as FitRecommendation) ?? undefined,
+    outfit: (r.outfit as unknown as OutfitItem[] | null) ?? undefined,
     createdAt: r.createdAt,
   });
 
@@ -42,6 +43,7 @@ function toData(s: TryOnSession) {
     failureReason: p.failureReason ?? null,
     statusChangedAt: p.statusChangedAt,
     fitRecommendation: (p.fitRecommendation as unknown as Prisma.InputJsonValue) ?? undefined,
+    outfit: (p.outfit as unknown as Prisma.InputJsonValue) ?? undefined,
   };
 }
 

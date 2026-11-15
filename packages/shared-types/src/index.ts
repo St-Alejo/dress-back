@@ -64,6 +64,35 @@ export function aiCanDress(body: Pick<SimilarBodyModel, 'onePiece' | 'handsInPoc
   return !(body.onePiece && (category === 'top' || category === 'bottom'));
 }
 
+/** Zonas del cuerpo de un conjunto: una prenda por zona. */
+export type OutfitSlot = 'top' | 'bottom' | 'outerwear' | 'footwear' | 'accessory';
+
+/** Zonas que ocupa cada categoría: un vestido ocupa arriba y abajo. */
+export function slotsOf(category: GarmentCategory): OutfitSlot[] {
+  return category === 'dress' ? ['top', 'bottom'] : [category];
+}
+
+/** Prendas que la IA (difusión) sabe poner; calzado y accesorios solo van en la vista instantánea. */
+export const AI_WEARABLE: readonly GarmentCategory[] = ['top', 'bottom', 'dress', 'outerwear'];
+
+/**
+ * Orden en que la IA viste un conjunto, de dentro hacia fuera: cada prenda se aplica sobre el
+ * resultado de la anterior (la chaqueta va encima de la camisa).
+ */
+export const AI_DRESSING_ORDER: Readonly<Record<GarmentCategory, number>> = {
+  bottom: 0, dress: 1, top: 2, outerwear: 3, footwear: 4, accessory: 5,
+};
+
+/** Zona repetida en un conjunto (p. ej. dos camisas, o vestido + pantalón), o null si es posible. */
+export function outfitConflict(categories: GarmentCategory[]): OutfitSlot | null {
+  const used = new Set<OutfitSlot>();
+  for (const slot of categories.flatMap(slotsOf)) {
+    if (used.has(slot)) return slot;
+    used.add(slot);
+  }
+  return null;
+}
+
 /**
  * Landmarks de MediaPipe (BlazePose, 33 puntos, normalizados 0–1) y segmentación selfie_multiclass
  * de la foto de un modelo, codificada por tramos [etiqueta, longitud, …] fila a fila.

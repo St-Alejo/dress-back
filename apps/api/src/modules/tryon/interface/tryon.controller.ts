@@ -13,7 +13,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { IsIn, IsOptional, IsUUID, Equals } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, Equals, IsIn, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 import type { TryOnMode } from '@vestirse/shared-types';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
@@ -22,10 +23,17 @@ import { MAX_PHOTO_BYTES, TryOnService } from '../application/tryon.service';
 
 const MODES: TryOnMode[] = ['similar-model', 'live-overlay', 'photorealistic'];
 
+class OutfitItemDto {
+  @IsUUID() garmentId: string;
+  @IsString() @MaxLength(10) size: string;
+}
+
 class StartSessionDto {
   @IsUUID() garmentId: string;
   @IsIn(MODES) mode: TryOnMode;
   @IsOptional() @IsUUID() bodyModelId?: string;
+  /** Probador: varias prendas a la vez, una por zona del cuerpo. */
+  @IsOptional() @ValidateNested({ each: true }) @Type(() => OutfitItemDto) @ArrayMinSize(1) @ArrayMaxSize(5) outfit?: OutfitItemDto[];
 }
 
 class ChangeModeDto {
