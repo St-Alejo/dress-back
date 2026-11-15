@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { PrismaClient } from '../src/generated/prisma/client';
 import type { ObjectStorage } from '../src/common/storage';
+import { seedDemoFavorites } from './demo-favorites';
 
 /** La persona de la cuenta demo: el modelo "athletic" del catálogo (foto de Pexels, con su crédito). */
 const DEMO_BODY = 'b05';
@@ -31,5 +32,7 @@ export async function seedDemoAccount(prisma: PrismaClient, storage: ObjectStora
     update: profile,
     create: { userId: user.id, consentAt: new Date(), ...profile },
   });
-  return email;
+  // Conjuntos favoritos ya generados con IA (él y su esposa): se cargan sin volver a gastar.
+  const favorites = await seedDemoFavorites(prisma, storage, user.id, join(photosDir, '..', 'favorites'));
+  return `${email} (${favorites} favoritos)`;
 }

@@ -19,3 +19,6 @@ seed/photos/_raw/
 
 # Gasto acumulado de la API de OpenAI (worker local)
 .openai-spend.json
+
+# Pasos intermedios del generador de favoritos de la demo (solo para revisar)
+seed/favorites/*.fashn.png
