@@ -1,15 +1,12 @@
 import { Injectable, NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import sharp from 'sharp';
-import { aiCanDress, type GarmentCategory } from '@vestirse/shared-types';
+import { aiCanDress, aiCanWear } from '@vestirse/shared-types';
 import { mediaUrl } from '../../../common/mappers';
 import { ObjectStorage } from '../../../common/storage';
 import { AiSettingsService } from '../../ai-settings/ai-settings.module';
 import { CatalogRepository } from '../../catalog/application/catalog.repository';
 import { describeBody, describeFit } from './fit-brief';
 import { GarmentTransferPort, TransferUnavailableError } from './garment-transfer.port';
-
-/** Prendas que un motor de prueba puede poner sobre una persona. */
-const WEARABLE: ReadonlySet<GarmentCategory> = new Set(['top', 'bottom', 'dress', 'outerwear']);
 
 export interface ModelPreview {
   imageUrl: string;
@@ -54,7 +51,7 @@ export class ModelPreviewService {
       this.catalog.bodyModelPhoto(bodyModelId),
     ]);
     if (!garment || !photo || !body) throw new NotFoundException();
-    if (!WEARABLE.has(garment.category)) throw new UnprocessableEntityException('esta prenda no se puede probar sobre un modelo');
+    if (!aiCanWear(garment)) throw new UnprocessableEntityException('esta prenda no se puede probar sobre un modelo');
     if (!aiCanDress(body, garment.category)) throw new UnprocessableEntityException('en la foto de este modelo la IA no puede cambiar esa parte');
 
     const [person, garmentImage] = await Promise.all([this.storage.getBuffer(body.key), this.storage.getBuffer(photo.key)]);

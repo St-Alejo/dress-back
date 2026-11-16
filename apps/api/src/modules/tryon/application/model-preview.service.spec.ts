@@ -1,6 +1,6 @@
 import { ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import sharp from 'sharp';
-import type { GarmentItem } from '@vestirse/shared-types';
+import { OPEN_FRONT, type GarmentItem } from '@vestirse/shared-types';
 import { MemoryStorage } from '../../../testing/memory';
 import type { AiSettingsService } from '../../ai-settings/ai-settings.module';
 import type { CatalogRepository } from '../../catalog/application/catalog.repository';
@@ -16,7 +16,7 @@ class FakeTransfer extends GarmentTransferPort {
   }
 }
 
-async function setup(category: GarmentItem['category'] = 'dress', onePiece = false, handsInPockets = false) {
+async function setup(category: GarmentItem['category'] = 'dress', onePiece = false, handsInPockets = false, knownLimitations: string[] = []) {
   const storage = new MemoryStorage();
   storage.objects.set('catalog/bodies/b1/photo.jpg', Buffer.from('person'));
   storage.objects.set('catalog/garments/g1/photo.jpg', Buffer.from('garment'));
@@ -25,7 +25,7 @@ async function setup(category: GarmentItem['category'] = 'dress', onePiece = fal
   transfer.next = async () => ({ image: png, engine: 'hf-fashn', durationMs: 5 });
   const previews = new Map<string, string>();
   const catalog = {
-    findGarment: async () => ({ id: 'g1', name: 'Vestido', category, color: '#ff0000' }) as GarmentItem,
+    findGarment: async () => ({ id: 'g1', name: 'Vestido', category, color: '#ff0000', knownLimitations }) as GarmentItem,
     garmentPhoto: async () => ({ key: 'catalog/garments/g1/photo.jpg', photoType: 'flat-lay' }),
     bodyModelPhoto: async () => ({ key: 'catalog/bodies/b1/photo.jpg', onePiece, handsInPockets }),
     findPreviewKey: async (b: string, g: string) => previews.get(`${b}:${g}`) ?? null,
@@ -65,6 +65,12 @@ describe('ModelPreviewService', () => {
 
   it('rechaza calzado y accesorios: ningún motor los pone sobre una persona', async () => {
     const env = await setup('footwear');
+    await expect(env.service.ensure('b1', 'g1')).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(env.transfer.calls).toHaveLength(0);
+  });
+
+  it('un cárdigan abierto sin nada debajo no pasa por la IA (rellenaría el escote con piel)', async () => {
+    const env = await setup('top', false, false, [OPEN_FRONT]);
     await expect(env.service.ensure('b1', 'g1')).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(env.transfer.calls).toHaveLength(0);
   });

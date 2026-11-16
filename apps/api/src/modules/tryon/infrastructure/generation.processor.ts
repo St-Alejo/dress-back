@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, Optional } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import { AI_DRESSING_ORDER, AI_WEARABLE, type GarmentItem } from '@vestirse/shared-types';
+import { AI_DRESSING_ORDER, AI_WEARABLE, OPEN_FRONT, type GarmentItem } from '@vestirse/shared-types';
 import { ObjectStorage } from '../../../common/storage';
 import { AiSettingsService } from '../../ai-settings/ai-settings.module';
 import { CatalogRepository } from '../../catalog/application/catalog.repository';
@@ -138,6 +138,8 @@ export class GenerationProcessor extends WorkerHost {
   private wearable(found: LoadedGarment[]): TransferGarment[] {
     const single = found.length === 1;
     return found
+      // Abierta por delante: la IA pondría piel en el escote; esa prenda queda fuera del motor.
+      .filter((g) => !(g.garment.knownLimitations ?? []).includes(OPEN_FRONT))
       .filter((g) => single || AI_WEARABLE.includes(g.garment.category))
       .sort((a, b) => AI_DRESSING_ORDER[a.garment.category] - AI_DRESSING_ORDER[b.garment.category])
       .map(({ garment, photo, image }) => ({
