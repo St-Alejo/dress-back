@@ -11,7 +11,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 RG=${RG:-rg-vestirse-demo}
-ENV_NAME=${ENV_NAME:-cae-vestirse}
+# La suscripción de estudiante admite un solo entorno: se comparte el de Interiores (las apps
+# viven en $RG, así que borrar ese grupo no toca Interiores; borrar rg-interiores-demo sí rompe esta demo).
+ENV_NAME=${ENV_NAME:-cae-interiores}
+ENV_RG=${ENV_RG:-rg-interiores-demo}
 ACR=${ACR:?define ACR}
 TAG=${TAG:?define TAG}
 BUDGET=${OPENAI_BUDGET_USD:-1.00}
@@ -22,9 +25,9 @@ OPENAI_KEY=$(envval OPENAI_API_KEY)
 GROQ_KEY=$(envval GROQ_API_KEY)
 [ -n "$OPENAI_KEY" ] || { echo "falta OPENAI_API_KEY en services/ai-worker/.env" >&2; exit 1; }
 
-ENV_ID=$(az containerapp env show -n "$ENV_NAME" -g "$RG" --query id -o tsv)
-LOC=$(az containerapp env show -n "$ENV_NAME" -g "$RG" --query location -o tsv)
-DOMAIN=$(az containerapp env show -n "$ENV_NAME" -g "$RG" --query properties.defaultDomain -o tsv)
+ENV_ID=$(az containerapp env show -n "$ENV_NAME" -g "$ENV_RG" --query id -o tsv)
+LOC=$(az containerapp env show -n "$ENV_NAME" -g "$ENV_RG" --query location -o tsv)
+DOMAIN=$(az containerapp env show -n "$ENV_NAME" -g "$ENV_RG" --query properties.defaultDomain -o tsv)
 API_FQDN=ca-vestirse-api.internal.$DOMAIN
 WEB_URL=https://ca-vestirse-web.$DOMAIN
 ACR_PASS=$(az acr credential show -n "$ACR" --query 'passwords[0].value' -o tsv)
