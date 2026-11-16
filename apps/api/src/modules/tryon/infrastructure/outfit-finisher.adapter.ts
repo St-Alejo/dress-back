@@ -12,18 +12,27 @@ export class WorkerOutfitFinisher extends OutfitFinisherPort {
   private readonly logger = new Logger(WorkerOutfitFinisher.name);
   private readonly baseUrl: string;
   private readonly token?: string;
+  override readonly dressesOutfits: boolean;
 
   constructor(config: ConfigService) {
     super();
     this.baseUrl = config.getOrThrow<string>('AI_WORKER_URL');
     this.token = config.get<string>('WORKER_TOKEN') || undefined;
+    this.dressesOutfits = config.get<string>('AI_DRESS_ENGINE') === 'openai';
   }
 
   async finish(req: FinishRequest): Promise<TransferResult | null> {
     const form = new FormData();
     form.append('person_image', new Blob([new Uint8Array(req.person)], { type: 'image/png' }), 'person.png');
     req.pieces.forEach((p, i) => form.append('item_images', new Blob([new Uint8Array(p.image)], { type: p.mime }), `item-${i}.jpg`));
-    form.append('manifest', JSON.stringify({ pieces: req.pieces.map(({ category, name, delta }, index) => ({ index, category, name, delta })) }));
+    form.append(
+      'manifest',
+      JSON.stringify({
+        mode: req.mode ?? 'retouch',
+        body: req.body ?? '',
+        pieces: req.pieces.map(({ category, name, delta, openFront }, index) => ({ index, category, name, delta, openFront: !!openFront })),
+      }),
+    );
     const headers: Record<string, string> = { [WORKER_HEADERS.requestId]: req.requestId };
     if (this.token) headers[WORKER_HEADERS.token] = this.token;
     try {

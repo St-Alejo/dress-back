@@ -4,7 +4,7 @@ import { OPEN_FRONT, type GarmentItem } from '@vestirse/shared-types';
 import { MemoryStorage } from '../../../testing/memory';
 import type { AiSettingsService } from '../../ai-settings/ai-settings.module';
 import type { CatalogRepository } from '../../catalog/application/catalog.repository';
-import { GarmentTransferPort, TransferUnavailableError, type TransferRequest, type TransferResult } from './garment-transfer.port';
+import { GarmentTransferPort, TransferUnavailableError, type FinishRequest, type TransferRequest, type TransferResult } from './garment-transfer.port';
 import { ModelPreviewService } from './model-preview.service';
 
 class FakeTransfer extends GarmentTransferPort {
@@ -73,6 +73,20 @@ describe('ModelPreviewService', () => {
     const env = await setup('top', false, false, [OPEN_FRONT]);
     await expect(env.service.ensure('b1', 'g1')).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(env.transfer.calls).toHaveLength(0);
+  });
+
+  it('con IA de imagen viste también el cárdigan abierto, desde la foto del modelo', async () => {
+    const env = await setup('top', false, false, [OPEN_FRONT]);
+    const asks: FinishRequest[] = [];
+    const png = await sharp({ create: { width: 4, height: 6, channels: 3, background: '#aa0000' } }).png().toBuffer();
+    (env.service as unknown as Record<string, unknown>).finisher = {
+      dressesOutfits: true,
+      finish: async (req: FinishRequest) => (asks.push(req), { image: png, engine: 'openai', durationMs: 1 }),
+    };
+    await expect(env.service.ensure('b1', 'g1')).resolves.toMatchObject({ cached: false });
+    expect(env.transfer.calls).toHaveLength(0);
+    expect(asks[0]).toMatchObject({ mode: 'dress', pieces: [{ category: 'top', openFront: true }] });
+    expect(asks[0]!.person.toString()).toBe('person');
   });
 
   it('sobre un modelo con vestido no prueba partes de arriba ni de abajo (saldría una túnica)', async () => {

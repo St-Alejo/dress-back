@@ -3,7 +3,7 @@ import io
 import json
 import time
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, File, Form, Header, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -237,12 +237,18 @@ class FinishPiece(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=120)]
     # Tallas de diferencia con la recomendada (+1 = una más grande).
     delta: Annotated[int, Field(ge=-3, le=3)] = 0
+    # Abierta por delante (cárdigan): al vestir se pide una camiseta lisa debajo.
+    openFront: bool = False
 
 
 class FinishManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     pieces: Annotated[list[FinishPiece], Field(min_length=1, max_length=5)]
+    # retouch: la persona ya viene vestida por el probador. dress: es la foto original y se viste todo aquí.
+    mode: Literal["retouch", "dress"] = "retouch"
+    # Medidas del perfil en una frase (solo números de talla, sin juicios).
+    body: Annotated[str, Field(max_length=200)] = ""
 
 
 @app.post("/v1/finish", dependencies=[Depends(require_token)])
@@ -267,10 +273,14 @@ async def finish(
         raise WorkerError("not-configured", "acabado con IA sin clave de OpenAI")
     person = await _read_limited(person_image, settings.max_upload_bytes, "persona")
     items = [await _read_limited(f, settings.max_upload_bytes, f"prenda {i}") for i, f in enumerate(item_images)]
-    pieces = [OutfitPiece(p.category, p.name, items[p.index], p.delta) for p in meta.pieces]
+    pieces = [OutfitPiece(p.category, p.name, items[p.index], p.delta, p.openFront) for p in meta.pieces]
     started = time.perf_counter()
     try:
-        result = await finisher.finish_outfit(Image.open(io.BytesIO(person)).convert("RGB"), pieces)
+        photo = Image.open(io.BytesIO(person)).convert("RGB")
+        if meta.mode == "dress":
+            result = await finisher.dress_outfit(photo, pieces, meta.body)
+        else:
+            result = await finisher.finish_outfit(photo, pieces)
     except FinishUnavailable as exc:
         code = "content-policy" if "safety" in str(exc) else "not-configured" if "tope" in str(exc) else "provider-error"
         raise WorkerError(code, str(exc)[:160]) from exc

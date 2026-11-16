@@ -76,14 +76,15 @@ export function slotsOf(category: GarmentCategory): OutfitSlot[] {
 export const AI_WEARABLE: readonly GarmentCategory[] = ['top', 'bottom', 'dress', 'outerwear'];
 
 /**
- * Prenda abierta por delante y fotografiada sin nada debajo (un cárdigan de escote hondo): la IA
- * rellena el escote con piel, así que esa prenda solo se ve en la vista aproximada y la cámara.
+ * Prenda abierta por delante y fotografiada sin nada debajo (un cárdigan de escote hondo): el motor de
+ * prueba (FASHN) rellena el escote con piel, así que con él no se usa; la IA de imagen le pone una
+ * camiseta lisa debajo.
  */
 export const OPEN_FRONT = 'limitation.openFront';
 
 /** ¿Puede la IA vestir esta prenda sobre una persona? */
-export function aiCanWear(garment: Pick<GarmentItem, 'category' | 'knownLimitations'>): boolean {
-  return AI_WEARABLE.includes(garment.category) && !(garment.knownLimitations ?? []).includes(OPEN_FRONT);
+export function aiCanWear(garment: Pick<GarmentItem, 'category'>): boolean {
+  return AI_WEARABLE.includes(garment.category);
 }
 
 /**

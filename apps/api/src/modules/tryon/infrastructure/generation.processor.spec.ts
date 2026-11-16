@@ -263,7 +263,7 @@ describe('GenerationProcessor con un conjunto (probador)', () => {
       const calls: FinishRequest[] = [];
       const p = env.processor as unknown as Record<string, unknown>;
       p.finisher = { finish: async (req: FinishRequest) => (calls.push(req), finish(req)) };
-      p.sizes = { forUser: async (userId?: string) => new Map(userId ? [['shirt', 'M'], ['jeans', 'M']] : []) };
+      p.sizes = { forUser: async (userId?: string) => new Map(userId ? [['shirt', 'M'], ['jeans', 'M']] : []), bodyFor: async () => '' };
       const catalog = p.catalog as Record<string, unknown>;
       const find = catalog.findGarment as (id: string) => Promise<GarmentItem>;
       catalog.findGarment = async (id: string) => ({ ...(await find(id)), sizeChart: CHART });
@@ -294,6 +294,36 @@ describe('GenerationProcessor con un conjunto (probador)', () => {
       const done = (await env.sessions.findById('s1'))!;
       expect(done.status).toBe('done');
       expect(env.storage.objects.get(done.resultKey!)?.toString()).toBe('paso-1');
+    });
+
+    it('con IA de imagen (AI_DRESS_ENGINE=openai) viste todo en una edición desde la foto original', async () => {
+      const env = outfitSetup();
+      const calls = withFinisher(env, async () => ({ image: Buffer.from('vestido-ia'), engine: 'openai:mini', durationMs: 30 }));
+      const p = env.processor as unknown as Record<string, Record<string, unknown>>;
+      p.finisher.dressesOutfits = true;
+      p.sizes.bodyFor = async () => '172 cm tall, chest 98 cm';
+      await outfitSession(env, [{ garmentId: 'shirt', size: 'L' }, { garmentId: 'jeans', size: '' }, { garmentId: 'shoes', size: '42' }], 'u1');
+      await env.processor.process(job());
+
+      expect(env.transfer.calls).toHaveLength(0);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toMatchObject({ mode: 'dress', body: '172 cm tall, chest 98 cm' });
+      expect(calls[0]!.person.toString()).toBe('persona');
+      // Sin talla elegida, la recomendada (delta 0).
+      expect(calls[0]!.pieces.map((x) => [x.name, x.delta])).toEqual([['Jean', 0], ['Camisa', 1], ['Zapatillas', 0]]);
+      const done = (await env.sessions.findById('s1'))!;
+      expect(env.storage.objects.get(done.resultKey!)?.toString()).toBe('vestido-ia');
+    });
+
+    it('con IA de imagen sin saldo ofrece la vista instantánea, sin llamar al motor', async () => {
+      const env = outfitSetup();
+      withFinisher(env, async () => null);
+      (env.processor as unknown as Record<string, Record<string, unknown>>).finisher.dressesOutfits = true;
+      await outfitSession(env, [{ garmentId: 'shirt', size: 'L' }, { garmentId: 'shoes', size: '42' }]);
+      await env.processor.process(job());
+      expect(env.transfer.calls).toHaveLength(0);
+      const s = (await env.sessions.findById('s1'))!;
+      expect(s.status).toBe('fallback');
     });
 
     it('una prueba de una sola prenda (sin conjunto) no pasa por el acabado', async () => {

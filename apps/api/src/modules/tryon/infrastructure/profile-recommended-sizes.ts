@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { FitEngine } from '@vestirse/fit-engine';
 import type { GarmentItem } from '@vestirse/shared-types';
 import { PrismaService } from '../../../common/prisma.service';
-import { RecommendedSizes } from '../application/outfit-finish';
+import { RecommendedSizes, bodyBrief } from '../application/outfit-finish';
 
 /** Recomienda con las medidas del perfil guardado (con consentimiento). Sin perfil, nada. */
 @Injectable()
@@ -36,5 +36,11 @@ export class ProfileRecommendedSizes extends RecommendedSizes {
       }
     }
     return sizes;
+  }
+
+  override async bodyFor(userId: string | undefined): Promise<string> {
+    if (!userId) return '';
+    const profile = await this.prisma.bodyProfile.findUnique({ where: { userId } });
+    return profile ? bodyBrief(profile) : '';
   }
 }

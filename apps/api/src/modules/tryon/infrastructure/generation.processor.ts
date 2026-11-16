@@ -71,13 +71,18 @@ export class GenerationProcessor extends WorkerHost {
     try {
       const [person, loaded] = await Promise.all([this.storage.getBuffer(session.photoKey), this.loadGarments(session)]);
       if (!person || !loaded) return this.end(session, 'failed', 'missing-input');
+      const imageAi = !!this.finisher?.dressesOutfits;
       const garments = this.wearable(loaded);
-      if (garments.length === 0) return this.end(session, 'fallback', 'unsupported');
+      if (!imageAi && garments.length === 0) return this.end(session, 'fallback', 'unsupported');
 
       // Con resultado propio, pedir otra generación es querer una imagen nueva: no se reutiliza.
-      const reused = session.resultKey || garments.length > 1 ? null : await this.previousResult(session, person);
+      const reused = session.resultKey || loaded.length > 1 ? null : await this.previousResult(session, person);
       let result: TransferResult = { image: reused ?? person, engine: 'reused', durationMs: 0 };
-      if (!reused) {
+      if (!reused && imageAi) {
+        const dressed = await this.dressWithImageAi(session, loaded, person, attempt);
+        if (!dressed) return this.end(session, 'fallback', 'ai-unavailable');
+        result = dressed;
+      } else if (!reused) {
         const credentials = await this.aiSettings.resolve();
         for (const [step, garment] of garments.entries()) {
           if (step > 0) {
@@ -171,6 +176,33 @@ export class GenerationProcessor extends WorkerHost {
     const finished = await this.finisher.finish({ requestId: `${session.id}-${attempt}-finish`, person: result.image, pieces });
     if (!finished) return result;
     return { image: finished.image, engine: `${result.engine}+${finished.engine}`, durationMs: result.durationMs + finished.durationMs };
+  }
+
+  /**
+   * Toda la prueba con IA de imagen (AI_DRESS_ENGINE=openai): la foto original, cada prenda con su talla
+   * frente a la recomendada para el perfil y las medidas guardadas, en UNA edición. Calzado y accesorios
+   * también. null si no está disponible (sin clave, sin saldo o rechazada).
+   */
+  private async dressWithImageAi(session: TryOnSession, loaded: LoadedGarment[], person: Buffer, attempt: number): Promise<TransferResult | null> {
+    const userId = session.snapshot.userId;
+    const outfit = session.snapshot.outfit ?? [];
+    const [recommended, body] = await Promise.all([
+      this.sizes?.forUser(userId, loaded.map((g) => g.garment)) ?? new Map<string, string>(),
+      this.sizes?.bodyFor(userId) ?? '',
+    ]);
+    const pieces = [...loaded]
+      .sort((a, b) => AI_DRESSING_ORDER[a.garment.category] - AI_DRESSING_ORDER[b.garment.category])
+      .slice(0, 5)
+      .map(({ garment, image }) => ({
+        image,
+        mime: 'image/jpeg',
+        category: garment.category,
+        name: garment.name,
+        delta: sizeDelta(garment.sizeChart ?? [], outfit.find((o) => o.garmentId === garment.id)?.size, recommended.get(garment.id)),
+        openFront: (garment.knownLimitations ?? []).includes(OPEN_FRONT),
+      }));
+    this.gateway.emit({ sessionId: session.id, status: 'processing', progress: 0.3 });
+    return this.finisher!.finish({ requestId: `${session.id}-${attempt}-dress`, mode: 'dress', person, pieces, body });
   }
 
   private async previousResult(session: TryOnSession, person: Buffer): Promise<Buffer | null> {

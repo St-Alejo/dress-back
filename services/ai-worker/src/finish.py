@@ -72,6 +72,8 @@ class OutfitPiece:
     name: str
     image: bytes
     delta: int = 0
+    # Abierta por delante (cárdigan): se pide una camiseta lisa debajo.
+    open_front: bool = False
 
 
 def outfit_prompt(pieces: list[OutfitPiece]) -> str:
@@ -101,6 +103,52 @@ def outfit_prompt(pieces: list[OutfitPiece]) -> str:
         + "\nKeep the same model (same face and hair), pose, framing and camera distance. Background: the same "
         "bright off-white plain studio wall, evenly lit, with no vignette, no dark edges and no glow. "
         "Same outfit, only these pieces."
+    )
+
+
+def _fit_line(p: OutfitPiece) -> str:
+    if p.category == "footwear":
+        return "they are shoes worn on both feet"
+    if p.category == "accessory":
+        return "an accessory worn as in the product photo"
+    if p.delta and p.category in LOOSE:
+        steps = "one size" if abs(p.delta) == 1 else f"{abs(p.delta)} sizes"
+        if p.delta > 0:
+            return f"it is {steps} too large for this person, so it fits loose ({LOOSE[p.category]})"
+        return f"it is {steps} too small for this person, so it fits tight ({TIGHT[p.category]})"
+    return "it fits this person true to size, as the recommended size for their measurements"
+
+
+def dress_prompt(pieces: list[OutfitPiece], body: str = "") -> str:
+    """
+    Prueba completa con IA de imagen: la persona de la imagen 1 (su foto, sin ropa del catálogo) aparece
+    con las prendas de las imágenes 2, 3, ... Fiel a la persona: misma cara, cuerpo y proporciones.
+    """
+    lines = []
+    for i, p in enumerate(pieces, start=2):
+        line = f"- Image {i} is the {ROLE.get(p.category, p.category)} ({p.name}): {_fit_line(p)}"
+        if p.category == "dress":
+            line += "; it is a one-piece dress worn on its own, with bare legs below the hem and no trousers"
+        if p.category == "top" and p.open_front:
+            line += "; it is an open-front cardigan, worn over a plain white crew-neck t-shirt"
+        lines.append(line + ".")
+    worn = {p.category for p in pieces}
+    keep = []
+    if not worn & {"bottom", "dress"}:
+        keep.append("their own trousers or skirt")
+    if "footwear" not in worn:
+        keep.append("their own shoes")
+    keep_line = f" Keep {' and '.join(keep)} from image 1." if keep else ""
+    body_line = f" About this person: {body}." if body else ""
+    return (
+        "Realistic full-body fashion photo for a virtual fitting room. Show the exact same person from image 1 "
+        "wearing these catalog products:\n"
+        + "\n".join(lines)
+        + "\nThe person must stay faithful to image 1: same face, identity, hairstyle, skin tone, age, height, body "
+        "shape, proportions and weight, with no idealization." + body_line + keep_line
+        + " Each product keeps its true color, fabric, pattern, collar, buttons and length, with natural folds and "
+        "drape on this body. Same pose and camera framing as image 1, full body visible from head to feet. "
+        "Background: bright off-white plain studio wall, evenly lit, no vignette."
     )
 
 
@@ -231,3 +279,11 @@ class ImageFinisher:
         images += [(f"item{i}.jpg", _jpeg(Image.open(io.BytesIO(p.image)), 640), "image/jpeg") for i, p in enumerate(pieces)]
         # Sin máscara: con un rectángulo editable la IA a veces pintaba una viñeta oscura fuera de él.
         return await self._edit(images, outfit_prompt(pieces), "1024x1536")
+
+    async def dress_outfit(self, person: Image.Image, pieces: list[OutfitPiece], body: str = "") -> Image.Image:
+        """Prueba completa en UNA edición: la foto de la persona y las prendas del catálogo. PNG 1024x1536."""
+        pieces = pieces[:MAX_PIECES]
+        canvas, _ = portrait_canvas(person)
+        images = [("person.png", _png(canvas), "image/png")]
+        images += [(f"item{i}.jpg", _jpeg(Image.open(io.BytesIO(p.image)), 640), "image/jpeg") for i, p in enumerate(pieces)]
+        return await self._edit(images, dress_prompt(pieces, body), "1024x1536")

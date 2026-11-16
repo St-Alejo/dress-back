@@ -127,7 +127,8 @@ export class FavoritesService {
       title,
       wearer: dto.wearer?.trim() || undefined,
       bodyModelId: session.snapshot.bodyModelId,
-      items: outfit.map((o) => ({ ...o, recommendedSize: recommended.get(o.garmentId) })),
+      // Sin talla elegida, la IA probó la recomendada para el perfil.
+      items: outfit.map((o) => ({ ...o, size: o.size || recommended.get(o.garmentId) || '', recommendedSize: recommended.get(o.garmentId) })),
       image,
     });
     return toDto(row, new Map(garments.map((g) => [g.id, g])));

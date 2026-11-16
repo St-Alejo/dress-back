@@ -20,7 +20,7 @@ describe('WorkerOutfitFinisher', () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('http://worker/v1/finish');
     const form = init!.body as FormData;
-    expect(JSON.parse(form.get('manifest') as string)).toEqual({ pieces: [{ index: 0, category: 'top', name: 'Camisa', delta: 1 }] });
+    expect(JSON.parse(form.get('manifest') as string)).toEqual({ mode: 'retouch', body: '', pieces: [{ index: 0, category: 'top', name: 'Camisa', delta: 1, openFront: false }] });
     expect((init!.headers as Record<string, string>)['X-Worker-Token']).toBe('secreto');
   });
 

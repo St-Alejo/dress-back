@@ -55,13 +55,22 @@ export interface FinishPiece {
   category: GarmentCategory;
   name: string;
   delta: number;
+  /** Abierta por delante (cárdigan): al vestir con IA de imagen se pide una camiseta lisa debajo. */
+  openFront?: boolean;
 }
 
 export interface FinishRequest {
   requestId: string;
-  /** Resultado del probador (la persona ya vestida). */
+  /**
+   * `retouch` (por defecto): `person` es el resultado del probador y solo se retoca.
+   * `dress`: `person` es la foto original y la IA de imagen pone todo el conjunto en una edición.
+   */
+  mode?: 'retouch' | 'dress';
+  /** Persona del probador: la foto y, si las dio en su perfil, sus medidas. */
   person: Buffer;
   pieces: FinishPiece[];
+  /** Medidas del perfil en una frase ("172 cm tall, chest 98 cm…"), para que la ropa caiga como en ese cuerpo. */
+  body?: string;
 }
 
 /**
@@ -69,5 +78,7 @@ export interface FinishRequest {
  * zapatos. Devuelve null si no está disponible; la prueba se queda con el resultado del probador.
  */
 export abstract class OutfitFinisherPort {
+  /** true = la IA de imagen viste el conjunto entero (AI_DRESS_ENGINE=openai) en vez del motor de prueba. */
+  readonly dressesOutfits: boolean = false;
   abstract finish(req: FinishRequest): Promise<TransferResult | null>;
 }

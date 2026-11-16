@@ -7,7 +7,7 @@ import httpx
 import pytest
 from PIL import Image
 
-from src.finish import FinishUnavailable, ImageFinisher, OutfitPiece, edit_mask, outfit_prompt, outfit_zone, person_box, portrait_canvas
+from src.finish import FinishUnavailable, ImageFinisher, OutfitPiece, dress_prompt, edit_mask, outfit_prompt, outfit_zone, person_box, portrait_canvas
 from src.main import get_finisher
 from src.vision import SpendMeter
 
@@ -177,3 +177,38 @@ def test_endpoint_maps_errors_to_the_contract(make_client):
 def test_a_dress_is_worn_alone_without_trousers():
     text = outfit_prompt([OutfitPiece("dress", "Vestido floral", b"", -1)])
     assert "one-piece dress worn on its own" in text and "no trousers" in text
+
+
+def test_dress_prompt_is_faithful_to_the_person_and_their_measurements():
+    text = dress_prompt(PIECES, "172 cm tall, chest 98 cm")
+    assert "same face" in text and "body shape, proportions and weight" in text and "no idealization" in text
+    assert "172 cm tall, chest 98 cm" in text
+    assert "Image 2 is the top (Camisa Oxford): it is one size too large" in text
+    assert "Image 4 is the shoes" in text
+    # Sin pantalón en el conjunto, conserva el suyo; con zapatos, no conserva los suyos.
+    assert "Keep" not in text
+    only_top = dress_prompt([OutfitPiece("top", "Camisa", b"", 0)])
+    assert "Keep their own trousers or skirt and their own shoes from image 1." in only_top
+    assert "About this person" not in only_top
+
+
+def test_dress_prompt_puts_a_tee_under_an_open_cardigan_and_avoids_rejected_phrases():
+    text = dress_prompt([OutfitPiece("top", "Cárdigan", b"", 0, True)]).lower()
+    assert "plain white crew-neck t-shirt" in text
+    for phrase in ("undress", "remove", "naked", "nude", "slim"):
+        assert phrase not in text
+
+
+def test_endpoint_dress_mode_sends_the_original_photo_and_all_pieces(make_client):
+    from src.main import app
+
+    seen: list = []
+    client = make_client()
+    app.dependency_overrides[get_finisher] = lambda: finisher(edits_reply(seen))
+    res = client.post("/v1/finish", **finish_form({**MANIFEST, "mode": "dress", "body": "170 cm tall"}))
+    assert res.status_code == 200, res.text
+    body = seen[0].content.decode("latin-1")
+    assert "Show the exact same person from image 1" in body and "170 cm tall" in body
+    assert body.count('name="image[]"') == 4
+    bad = {**MANIFEST, "mode": "erase"}
+    assert client.post("/v1/finish", **finish_form(bad)).status_code == 400
