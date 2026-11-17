@@ -1,0 +1,12 @@
+# Configuración de OSV-Scanner (job «Dependencias (OSV)» del CI).
+# Cada excepción lleva su motivo y vence sola: al vencer, el CI vuelve a fallar y hay que revisarla.
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2027-02-15
+reason = "glob 10/13 solo lo usan Jest y Nest CLI (desarrollo) sobre carpetas del propio repo; el arreglo exige glob 14, que esas herramientas aún no admiten."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2027-02-15
+reason = "minimatch 9/10 solo lo usan Jest, Nest CLI y glob (desarrollo) con patrones del propio repo; el arreglo exige minimatch 11."

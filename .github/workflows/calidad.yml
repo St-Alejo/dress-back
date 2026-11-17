@@ -1,0 +1,38 @@
+# Seguridad de dependencias con OSV-Scanner (npm y Python).
+# Este repo no tiene web (la sirve St-Alejo/dress), así que Lighthouse corre allá.
+# Corre en cada push y PR, y cada lunes: aparecen vulnerabilidades nuevas aunque el código no cambie.
+name: Calidad
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  osv:
+    name: Dependencias (OSV)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      # OSV necesita versiones exactas y el ai-worker solo declara rangos en pyproject.toml:
+      # pip resuelve sus dependencias (sin instalarlas) y quedan en un requirements.txt temporal.
+      - name: Versiones exactas de Python
+        run: |
+          mkdir -p .osv-python/ai-worker
+          pip install --quiet --dry-run --ignore-installed --report .osv-python/ai-worker/report.json ./services/ai-worker
+          python -c "import json,sys; r=json.load(open(sys.argv[1],encoding='utf-8')); open(sys.argv[2],'w').write(''.join(i['metadata']['name']+'=='+i['metadata']['version']+'\n' for i in r['install'] if 'dir_info' not in i.get('download_info',{})))" .osv-python/ai-worker/report.json .osv-python/ai-worker/requirements.txt
+      # Revisa package-lock.json y las dependencias de Python contra osv.dev.
+      # Falla si encuentra una vulnerabilidad que no esté justificada en osv-scanner.toml.
+      - uses: google/osv-scanner-action/osv-scanner-action@v2.7.0
+        with:
+          scan-args: |-
+            --config=osv-scanner.toml
+            --recursive
+            ./
